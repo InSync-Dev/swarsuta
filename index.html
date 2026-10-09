@@ -1,0 +1,1735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Swarsuta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a practice room. Lesson path on the home screen, a single
+   "stage" on the practice screen: swara tiles on top (like the text you type
+   in a typing tutor), a scrolling pitch graph beneath, tuner + controls below.
+   Saffron = the note you are aiming at. Teal = your voice. */
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --surface-hi:#f4f6fa; --line:#d5dbe5;
+  --fg:#141922; --muted:#586376;
+  --accent:#b25f00; --accent-soft:rgba(178,95,0,.13); --accent-fg:#ffffff;
+  --you:#0b8a62; --you-soft:rgba(11,138,98,.14); --bad:#c0392b;
+  --ff-body:'Hanken Grotesk','Noto Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --ff-dev:'Tiro Devanagari Hindi','Noto Serif Devanagari','Noto Sans Devanagari','Mangal',serif;
+  --ff-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1218; --surface:#161b24; --surface-hi:#1d2430; --line:#28313e;
+    --fg:#edf0f5; --muted:#97a3b3;
+    --accent:#f3a43b; --accent-soft:rgba(243,164,59,.15); --accent-fg:#241600;
+    --you:#4fd4a4; --you-soft:rgba(79,212,164,.15); --bad:#ff7a6b;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1218; --surface:#161b24; --surface-hi:#1d2430; --line:#28313e;
+  --fg:#edf0f5; --muted:#97a3b3;
+  --accent:#f3a43b; --accent-soft:rgba(243,164,59,.15); --accent-fg:#241600;
+  --you:#4fd4a4; --you-soft:rgba(79,212,164,.15); --bad:#ff7a6b;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--ff-body);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--ff-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1,h2,h3,p{margin:0}
+h2,h3{text-wrap:balance}
+[hidden]{display:none!important}
+
+.app{max-width:920px;margin:0 auto;padding-inline:16px;padding-block:0 56px}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top,0px)) 0 12px;background:var(--bg);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.mark{font-family:var(--ff-dev);font-size:26px;line-height:1}
+.brand .sub{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 16px;font-weight:600;min-height:44px}
+.btn:hover{background:var(--surface-hi)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.45;cursor:default}
+
+/* ---------- studio ---------- */
+.studio{margin-top:20px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface);display:grid;gap:16px}
+.st-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.tan{display:flex;align-items:center;gap:14px;border:1px solid var(--line);background:var(--surface-hi);border-radius:14px;padding:10px 18px 10px 14px;min-height:56px;font-weight:600}
+.tan[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.strings{display:flex;gap:5px;align-items:center;height:30px}
+.strings i{display:block;width:3px;height:100%;border-radius:2px;background:var(--muted);opacity:.55;transform-origin:center}
+.strings i:nth-child(1){height:78%}.strings i:nth-child(4){height:100%}
+.strings i.p{background:var(--accent);opacity:1;animation:twang .9s ease-out}
+@keyframes twang{0%{transform:scaleX(3.2)}25%{transform:scaleX(1.8)}100%{transform:scaleX(1)}}
+.sa-val{display:flex;align-items:baseline;gap:10px}
+.sa-val strong{font-size:28px;line-height:1.1}
+.field{display:grid;gap:8px;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-width:44px;min-height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-hi);font-weight:600}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.step{display:flex;align-items:center;gap:10px}
+.step button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface-hi);font-size:18px;line-height:1}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:max-content}
+.seg button{border:0;background:var(--surface-hi);padding:9px 16px;font-weight:600;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+input[type=range]{width:100%;accent-color:var(--accent);min-height:30px}
+.mic-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.note{font-size:13px;color:var(--muted);min-width:0;flex:1 1 220px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:8px;vertical-align:middle}
+.dot.on{background:var(--you)}.dot.bad{background:var(--bad)}
+
+/* ---------- lesson path ---------- */
+.stage{margin-top:32px}
+.stage-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.stage-h h2{font-size:20px}
+.stage-h .dev{font-family:var(--ff-dev);color:var(--muted);font-size:18px;margin-left:8px}
+.stage-h .prog{font-size:12px;color:var(--muted)}
+.blurb{color:var(--muted);margin-top:4px;max-width:62ch}
+.lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:10px;margin-top:14px}
+.lesson{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:14px;text-align:left;
+  padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);min-width:0}
+.lesson:hover:not([disabled]){border-color:var(--accent)}
+.lesson[disabled]{opacity:.5;cursor:not-allowed}
+.badge{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:700;border:2px solid var(--line);background:var(--surface-hi)}
+.lesson.next .badge{border-color:var(--accent);color:var(--accent)}
+.lesson.done .badge{border-color:var(--you);background:var(--you-soft)}
+.lesson .t{font-weight:600}
+.lesson .tt{min-width:0}
+.lesson .seq{font-family:var(--ff-dev);color:var(--muted);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.lesson .meta{font-size:12px;color:var(--muted)}
+.stars{display:flex;gap:2px}
+.star{width:16px;height:16px;fill:none;stroke:var(--line);stroke-width:1.6}
+.star.on{fill:var(--accent);stroke:var(--accent)}
+.foot{margin-top:40px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.foot label{display:flex;gap:8px;align-items:center}
+.foot input{accent-color:var(--accent);width:18px;height:18px}
+.link{background:none;border:0;padding:6px 0;color:var(--muted);text-decoration:underline}
+
+/* ---------- practice ---------- */
+.p-head{display:flex;align-items:center;gap:12px;padding-top:16px}
+.p-title{flex:1;min-width:0}
+.p-title h2{font-size:22px;line-height:1.2}
+.p-meta{font-size:12px;color:var(--muted)}
+.tip{margin-top:12px;color:var(--muted);max-width:66ch}
+.progress{height:4px;border-radius:2px;background:var(--line);margin-top:14px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--you);transition:width .25s}
+.tiles{display:flex;flex-wrap:wrap;gap:10px 22px;margin:18px 0 6px}
+.grp{display:flex;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%}
+.tile{width:52px;height:68px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0}
+.tile .g{position:relative;font-family:var(--ff-dev);font-size:25px;line-height:1;padding:0 2px}
+.tile .r{font-size:11px;color:var(--muted);line-height:1}
+.tile.cur{border-color:var(--accent);background:var(--surface-hi);box-shadow:0 0 0 3px var(--accent-soft)}
+.tile.done{border-color:var(--you);background:var(--you-soft)}
+.tile.hear{border-color:var(--accent);background:var(--accent-soft)}
+.tile.bad{animation:shake .28s}
+.tile.pop{animation:pop .3s ease-out}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes pop{40%{transform:scale(1.12)}}
+/* octave and variant marks */
+.g .oc,.g .vr{position:absolute;display:none}
+.g.taar .oc{display:block;width:5px;height:5px;border-radius:50%;background:currentColor;left:50%;top:-8px;margin-left:-2px}
+.g.mandra .oc{display:block;width:5px;height:5px;border-radius:50%;background:currentColor;left:50%;bottom:-9px;margin-left:-2px}
+.g.komal .vr{display:block;left:10%;right:10%;bottom:-2px;height:2px;background:currentColor;border-radius:1px}
+.g.tivra .vr{display:block;left:50%;top:-7px;width:2px;height:8px;background:currentColor;margin-left:8px}
+
+.graph-wrap{position:relative;margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+#graph{display:block;width:100%;height:250px}
+.graph-hint{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:var(--muted);font-size:13px;pointer-events:none;padding:0 60px}
+.read{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.rbox{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:12px 14px;min-width:0}
+.rbox .big{font-size:26px;font-weight:700;line-height:1.2;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rbox .big .d{font-family:var(--ff-dev);font-weight:400;color:var(--muted);font-size:20px}
+.rbox .sm{font-size:12px;color:var(--muted)}
+.tuner{grid-column:1/-1;position:relative;height:34px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:0 14px}
+.tuner .track{position:absolute;left:14px;right:14px;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:var(--line)}
+.tuner .zone{position:absolute;top:0;bottom:0;background:var(--you-soft);border:1px solid var(--you);border-radius:3px}
+.tuner .mid{position:absolute;left:50%;top:-5px;bottom:-5px;width:2px;background:var(--muted);margin-left:-1px;opacity:.7}
+.tuner .needle{position:absolute;top:-7px;bottom:-7px;width:6px;margin-left:-3px;border-radius:3px;background:var(--accent);left:50%;transition:left .07s linear,opacity .15s}
+.tuner .needle.ok{background:var(--you)}
+.tuner .lab{position:absolute;top:-1px;font-size:10px;color:var(--muted);transform:translateY(-100%)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.controls .btn{flex:1 1 130px}
+.msg{margin-top:10px;font-size:13px;color:var(--muted);min-height:20px}
+.msg.warn{color:var(--bad)}
+.mini{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.mini .tan{padding:6px 14px 6px 10px;min-height:46px}
+.mini .strings{height:24px}
+.mini select{min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--surface-hi);padding:0 10px}
+.mini .sp{flex:1}
+details.tap{margin-top:14px;border:1px dashed var(--line);border-radius:14px;padding:10px 14px}
+details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:28px;display:flex;align-items:center}
+.tapkeys{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.tapkeys .tile{width:56px;height:60px}
+
+/* ---------- result sheet ---------- */
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(6,9,13,.6);display:grid;place-items:center;padding:16px}
+.sheet-in{width:100%;max-width:460px;max-height:100%;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;display:grid;gap:14px}
+.sheet-in .stars{justify-content:center;gap:8px}
+.sheet-in .star{width:38px;height:38px}
+.sheet-in h2{text-align:center;font-size:22px}
+.sheet-in .muted{text-align:center}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
+.stats div{background:var(--surface-hi);border-radius:12px;padding:10px;text-align:center;min-width:0}
+.stats dt{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stats dd{margin:2px 0 0;font-size:18px;font-weight:700}
+.rlist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.rt{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:40px;padding:6px 4px;border-radius:10px;border:1px solid var(--line)}
+.rt .g{position:relative;font-family:var(--ff-dev);font-size:18px;line-height:1.1}
+.rt b{font-size:11px;font-family:var(--ff-mono)}
+.rt.g3{border-color:var(--you);background:var(--you-soft)}
+.rt.g1{border-color:var(--accent);background:var(--accent-soft)}
+.rt.g0{border-color:var(--bad)}
+.sheet-actions{display:grid;gap:8px}
+
+/* ---------- modes ---------- */
+.modes{margin-top:28px;display:grid;gap:10px}
+.seg.wide{width:100%;max-width:420px}
+.seg.wide button{flex:1}
+#modeDesc{color:var(--muted);max-width:62ch}
+.mode-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;margin-top:14px}
+.rz-set{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-end}
+.rz-set .field{min-width:150px}
+.tile.miss{border-color:var(--bad);background:transparent}
+
+@media (max-width:520px){
+  .tile{width:46px;height:62px}
+  .tile .g{font-size:22px}
+  .tiles{gap:10px 16px}
+  .brand .sub{display:none}
+  .read{grid-template-columns:1fr}
+  #graph{height:220px}
+}
+@media (prefers-reduced-motion:reduce){
+  .strings i.p,.tile.bad,.tile.pop{animation:none}
+  .tuner .needle{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="mark">रियाज़</span><span class="sub">Swarsuta · sargam trainer</span></div>
+    <div class="pills"><span class="pill" id="streak">Start a streak</span><span class="pill mono" id="starTotal">★ 0</span></div>
+  </header>
+
+  <!-- ================= HOME ================= -->
+  <main id="home">
+    <section class="studio" aria-label="Studio settings">
+      <div class="st-top">
+        <button id="tanBtn" class="tan js-tan" type="button" aria-pressed="false">
+          <span class="strings" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="tl">Start tanpura</span>
+        </button>
+        <div>
+          <span class="eyebrow">Your Sa</span>
+          <div class="sa-val"><strong id="saName">C♯3</strong><span class="mono muted" id="saHz">138.6 Hz</span></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="eyebrow">Pitch of Sa</span>
+        <div class="chips" id="saChips" role="group" aria-label="Pitch of Sa"></div>
+        <div class="step">
+          <button id="octDn" type="button" aria-label="Lower octave">−</button>
+          <span id="octVal" class="mono">Octave 3</span>
+          <button id="octUp" type="button" aria-label="Higher octave">+</button>
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="field">
+          <span class="eyebrow">Octave match</span>
+          <div class="seg" id="anySeg" role="group" aria-label="Octave match">
+            <button type="button" data-v="1">Any</button><button type="button" data-v="0">Exact</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="eyebrow">Sound plays through</span>
+          <div class="seg" id="outSeg" role="group" aria-label="Sound output">
+            <button type="button" data-v="phones">Headphones</button><button type="button" data-v="speaker">Speaker</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="cycle" class="eyebrow">Tanpura cycle · <output id="cycleOut" class="mono"></output></label>
+          <input id="cycle" type="range" min="3.6" max="8" step="0.2">
+        </div>
+        <div class="field">
+          <label for="vol" class="eyebrow">Tanpura volume</label>
+          <input id="vol" type="range" min="0" max="1" step="0.05">
+        </div>
+      </div>
+
+      <div class="mic-row">
+        <button id="micBtn" class="btn" type="button">Enable microphone</button>
+        <span id="micNote" class="note"></span>
+      </div>
+    </section>
+
+    <section class="modes" aria-label="Mode">
+      <span class="eyebrow">Mode</span>
+      <div class="seg wide js-mode" role="group" aria-label="Mode">
+        <button type="button" data-v="practice">Practice</button>
+        <button type="button" data-v="test">Test</button>
+        <button type="button" data-v="riyaz">Riyaz</button>
+      </div>
+      <div class="seg wide js-free" role="group" aria-label="Practice style" hidden>
+        <button type="button" data-v="0">Guided</button>
+        <button type="button" data-v="1">Freehand loop</button>
+      </div>
+      <p id="modeDesc"></p>
+    </section>
+
+    <div id="stages"></div>
+
+    <div class="foot">
+      <label><input type="checkbox" id="unlockAll"> Unlock every lesson (prototype preview)</label>
+      <button class="link" id="resetBtn" type="button">Erase progress</button>
+    </div>
+  </main>
+
+  <!-- ================= PRACTICE ================= -->
+  <main id="practice" hidden>
+    <div class="p-head">
+      <button class="btn ghost" id="backBtn" type="button">← Lessons</button>
+      <div class="p-title">
+        <span class="eyebrow" id="pStage"></span>
+        <h2 id="pTitle"></h2>
+      </div>
+      <span class="mono p-meta" id="pTime">0:00</span>
+    </div>
+    <p class="tip" id="pTip"></p>
+    <div class="p-meta" id="pMeta" style="margin-top:6px"></div>
+    <div class="mode-row">
+      <div class="seg js-mode" role="group" aria-label="Mode">
+        <button type="button" data-v="practice">Practice</button>
+        <button type="button" data-v="test">Test</button>
+        <button type="button" data-v="riyaz">Riyaz</button>
+      </div>
+      <div class="seg js-free" role="group" aria-label="Practice style" hidden>
+        <button type="button" data-v="0">Guided</button>
+        <button type="button" data-v="1">Freehand loop</button>
+      </div>
+      <div class="rz-set" id="rzSet" hidden>
+        <div class="field">
+          <label for="tempo" class="eyebrow">Tempo · <output id="tempoOut" class="mono"></output></label>
+          <input id="tempo" type="range" min="40" max="100" step="4">
+        </div>
+        <div class="field" id="soundField" hidden>
+          <span class="eyebrow">Notes</span>
+          <div class="seg" id="soundSeg" role="group" aria-label="Play the notes aloud">
+            <button type="button" data-v="1">Sound</button><button type="button" data-v="0">Silent</button>
+          </div>
+        </div>
+        <div class="field" id="roundsField">
+          <span class="eyebrow">Rounds</span>
+          <div class="seg" id="roundsSeg" role="group" aria-label="Rounds">
+            <button type="button" data-v="3">3</button><button type="button" data-v="5">5</button><button type="button" data-v="10">10</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="progress" aria-hidden="true"><i id="pBar"></i></div>
+
+    <div class="tiles" id="tiles" aria-label="Swaras to sing"></div>
+
+    <div class="graph-wrap">
+      <canvas id="graph" aria-label="Live pitch graph"></canvas>
+      <div class="graph-hint" id="graphHint">Press “Start singing”. Your voice draws a line here; hold it inside the saffron band.</div>
+    </div>
+
+    <div class="read" id="readBox">
+      <div class="rbox"><span class="eyebrow">Sing</span>
+        <div class="big"><span id="tName">—</span><span class="d" id="tDev"></span></div>
+        <div class="sm mono" id="tHz"></div></div>
+      <div class="rbox"><span class="eyebrow">You are on</span>
+        <div class="big"><span id="youName">—</span></div>
+        <div class="sm" id="verdict">Mic is off</div></div>
+      <div class="tuner" aria-hidden="true">
+        <span class="lab" style="left:14px">flat</span><span class="lab" style="right:14px">sharp</span>
+        <div class="track"><div class="zone" id="zone"></div><div class="mid"></div><div class="needle" id="needle"></div></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="listenBtn" type="button">Listen</button>
+      <button class="btn primary" id="startBtn" type="button">Start singing</button>
+      <button class="btn ghost" id="restartBtn" type="button">Restart</button>
+    </div>
+    <div class="msg" id="pMsg" role="status" aria-live="polite">Headphones keep the tanpura out of the microphone.</div>
+
+    <div class="mini">
+      <button id="tanBtn2" class="tan js-tan" type="button" aria-pressed="false">
+        <span class="strings" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="tl">Start tanpura</span>
+      </button>
+      <span class="sp"></span>
+      <label for="saSel" class="eyebrow">Sa</label>
+      <select id="saSel" aria-label="Pitch of Sa"></select>
+    </div>
+
+    <details class="tap">
+      <summary>No microphone? Tap the swaras instead (earns 1 star)</summary>
+      <div class="tapkeys" id="tapKeys"></div>
+    </details>
+  </main>
+</div>
+
+<!-- ================= RESULT ================= -->
+<div id="result" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="rTitle">
+  <div class="sheet-in">
+    <div class="stars" id="rStars"></div>
+    <h2 id="rTitle">Lesson complete</h2>
+    <p class="muted" id="rSub"></p>
+    <dl class="stats">
+      <div><dt id="rDevL">Off pitch</dt><dd id="rDev" class="mono"></dd></div>
+      <div><dt id="rTimeL">Time</dt><dd id="rTime" class="mono"></dd></div>
+      <div><dt id="rNotesL">Swaras</dt><dd id="rNotes" class="mono"></dd></div>
+    </dl>
+    <div class="rlist" id="rList"></div>
+    <p class="muted" id="rBias"></p>
+    <div class="sheet-actions">
+      <button class="btn primary" id="rNext" type="button">Next lesson</button>
+      <button class="btn" id="rRetry" type="button">Try again</button>
+      <button class="btn ghost" id="rBack" type="button">Back to lessons</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   Swara table. Cents above Sa in just intonation, the tuning the tanpura
+   actually sings against. Lowercase = komal (flat) or, for m, tivra Ma.
+   ===================================================================== */
+const SW = {
+  S:{n:'Sa',   d:'सा',  c:0},
+  r:{n:'Re♭',  d:'रे',  c:111.73, kind:'komal'},
+  R:{n:'Re',   d:'रे',  c:203.91},
+  g:{n:'Ga♭',  d:'ग',   c:315.64, kind:'komal'},
+  G:{n:'Ga',   d:'ग',   c:386.31},
+  M:{n:'Ma',   d:'म',   c:498.04},
+  m:{n:'Ma♯',  d:'म',   c:590.22, kind:'tivra'},
+  P:{n:'Pa',   d:'प',   c:701.96},
+  d:{n:'Dha♭', d:'ध',   c:813.69, kind:'komal'},
+  D:{n:'Dha',  d:'ध',   c:884.36},
+  n:{n:'Ni♭',  d:'नि',  c:1017.60, kind:'komal'},
+  N:{n:'Ni',   d:'नि',  c:1088.27}
+};
+const ORDER = ['S','r','R','g','G','M','m','P','d','D','n','N'];
+
+/* Sequence notation: letter + optional ' (taar, octave up) or , (mandra,
+   octave down). "|" splits phrases. */
+function parseSeq(s){
+  const notes = [];
+  s.split('|').forEach((part, gi) => {
+    part.trim().split(/\s+/).filter(Boolean).forEach(tok => {
+      const m = /^([SRGMPDNrgdnm])(['’,]?)$/.exec(tok);
+      if(!m) throw new Error('Bad swara token: ' + tok);
+      const oct = m[2] === ',' ? -1 : (m[2] ? 1 : 0);
+      notes.push({k:m[1], oct, c:SW[m[1]].c + 1200*oct, grp:gi});
+    });
+  });
+  return notes;
+}
+
+/* =====================================================================
+   Curriculum. Each stage adds one idea; a lesson unlocks when the
+   previous one earns at least one star.
+   ===================================================================== */
+const STAGES = [
+  { name:'Find your Sa', dev:'षड्ज', tol:50, hold:.8,
+    blurb:'Everything in Indian music is measured from Sa. Sit inside the drone before you move.',
+    items:[
+      ['Sa', "S S S S", "Hum a steady “aaa” until your voice settles into the drone. Sa is home; every other swara is measured from it."],
+      ['Pa', "P P P P", "Pa sits a perfect fifth above Sa and is the second string of the tanpura. It should feel open and easy."],
+      ['Sa and Pa', "S P S P P S", "Move between the two anchors and listen to how Pa rings against Sa."],
+      ['Upper Sa', "S S' S S'", "Taar Sa is the same note one octave higher. Set Octave match to Exact to practise the real jump."]
+    ]},
+  { name:'Shuddha swaras', dev:'शुद्ध स्वर', tol:45, hold:.65,
+    blurb:'The seven natural notes, added one at a time, then joined into the scale.',
+    items:[
+      ['Re', "S R S R S", "Re is a whole step above Sa. Slide up from Sa, settle, do not overshoot."],
+      ['Ga', "S R G R G S", "Ga is the bright major third. It likes to drift flat, so aim a little high and let it settle."],
+      ['Ma', "S R G M G R S", "Ma is the perfect fourth. Hold it against the drone and notice the calm it creates."],
+      ['Dha', "M P D P M P D", "Dha is the major sixth. Approach it from Pa and keep the breath steady."],
+      ['Ni', "P D N D P N", "Ni is the leading note, one small step below upper Sa. It always wants to climb."],
+      ['Aroha', "S R G M P D N S'", "Ascend step by step. Even spacing and a clean landing on each swara."],
+      ['Avaroha', "S' N D P M G R S", "Descend with the same care. Landing on Sa should feel like coming home."]
+    ]},
+  { name:'Alankars', dev:'अलंकार', tol:40, hold:.5,
+    blurb:'Patterns that train the ear and voice to move cleanly between swaras.',
+    items:[
+      ['Alankar 1', "S R G | R G M | G M P | M P D | P D N | D N S'", "Groups of three, climbing one step each time. Keep the beat even."],
+      ['Alankar 2', "S R S | R G R | G M G | M P M | P D P | D N D | N S' N", "Step up, step back. You hear every interval twice."],
+      ['Alankar 3', "S G | R M | G P | M D | P N | D S'", "Leaps of a third keep your pitch honest."],
+      ['Alankar 4', "S R G R S | R G M G R | G M P M G | M P D P M | P D N D P | D N S' N D", "Five-note arches. Breathe at the gaps between groups."],
+      ['Descending patterns', "S' N D | N D P | D P M | P M G | M G R | G R S", "The first pattern, coming down the scale."]
+    ]},
+  { name:'Komal and Tivra', dev:'कोमल · तीव्र', tol:40, hold:.6,
+    blurb:'The five altered swaras. A line under a swara marks komal (flat); a tick above marks tivra (sharp).',
+    items:[
+      ['Komal Re', "S r S r S r", "Komal Re sits a semitone above Sa, squeezed against the drone. Listen for the tension."],
+      ['Komal Ga', "S R g R S g", "Komal Ga is the minor third, darker than Ga."],
+      ['Komal Dha', "P d P d P d", "Komal Dha is the minor sixth. Keep it soft and low."],
+      ['Komal Ni', "P D n D P n", "Komal Ni is the flat seventh, relaxed and open."],
+      ['Tivra Ma', "G m P m G m", "Tivra Ma is the only sharp swara. Yaman is built around it."]
+    ]},
+  { name:'Ragas', dev:'राग', tol:35, hold:.5,
+    blurb:'Each raga is a scale plus its characteristic phrases. First the scale, then the phrases that give it a face.',
+    items:[
+      ['Bhoopali scale', "S R G P D S' | S' D P G R S", "Five notes, no Ma and no Ni. A calm evening raga.", "Evening · pentatonic"],
+      ['Bhoopali phrases', "G R P G D P G R S", "A classic Bhoopali phrase. Dwell on Ga and Dha.", "Evening · pentatonic"],
+      ['Yaman scale', "N, R G m P D N S' | S' N D P m G R S", "Yaman uses tivra Ma. It begins from the lower Ni, a step below Sa.", "Early evening · tivra Ma"],
+      ['Yaman phrases', "N, R G R S | G m D N S' | N D P m G R S", "Rise from the lower Ni, linger on Ga, then glide down.", "Early evening · tivra Ma"],
+      ['Bhairav scale', "S r G M P d N S' | S' N d P M G r S", "Morning raga with komal Re and komal Dha. Sing them gravely and slowly.", "Morning · komal Re, komal Dha"],
+      ['Bhairav phrases', "S G M P d P | G M d P | G M r S", "Slow, weighty phrases with long pauses on Re♭ and Dha♭.", "Morning · komal Re, komal Dha"],
+      ['Kafi scale', "S R g M P D n S' | S' n D P M g R S", "Soft komal Ga and komal Ni give Kafi its gentle, folk-like colour.", "Late evening · komal Ga, komal Ni"],
+      ['Kafi phrases', "S R g M P | P D n D P | M g R S", "Three short phrases. Keep the komal notes relaxed, not pinched.", "Late evening · komal Ga, komal Ni"]
+    ]}
+];
+const LESSONS = [];
+STAGES.forEach((st, si) => st.items.forEach(it => {
+  LESSONS.push({id:LESSONS.length, st, si, title:it[0], seq:it[1], tip:it[2], meta:it[3]||'',
+                notes:parseSeq(it[1]), tol:st.tol, hold:st.hold});
+}));
+
+/* =====================================================================
+   State and helpers
+   ===================================================================== */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
+const wrap = d => (((d + 600) % 1200) + 1200) % 1200 - 600;
+const fmtT = s => { s = Math.floor(s); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); };
+const PCN = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const saLabel = m => PCN[m%12] + (Math.floor(m/12)-1);
+const midiHz = m => 440*Math.pow(2,(m-69)/12);
+
+const KEY = 'riyaz.v1';
+const store = {
+  get(){ try{ return JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){ return {}; } },
+  set(o){ try{ localStorage.setItem(KEY, JSON.stringify(o)); }catch(e){} }
+};
+const saved = store.get();
+const state = {
+  saMidi: clamp(saved.saMidi ?? 49, 36, 71),
+  any: saved.any ?? true,
+  cycle: saved.cycle ?? 5.2,
+  vol: saved.vol ?? 0.7,
+  stars: saved.stars || {},
+  unlockAll: !!saved.unlockAll,
+  streak: saved.streak || 0,
+  last: saved.last || '',
+  out: saved.out === 'speaker' ? 'speaker' : 'phones',
+  mode: ['practice','test','riyaz'].includes(saved.mode) ? saved.mode : 'practice',
+  tempo: clamp(saved.tempo ?? 60, 40, 100), rounds: [3,5,10].includes(saved.rounds) ? saved.rounds : 3,
+  free: !!saved.free, freeSound: saved.freeSound !== false,
+  gate: .012, needCal: true, spk: null,
+  tanpura:false, mic:null, micState:'off',
+  lesson:null, run:null
+};
+function persist(){
+  store.set({saMidi:state.saMidi, any:state.any, cycle:state.cycle, vol:state.vol, stars:state.stars,
+             unlockAll:state.unlockAll, streak:state.streak, last:state.last, out:state.out,
+             mode:state.mode, tempo:state.tempo, rounds:state.rounds, free:state.free, freeSound:state.freeSound});
+}
+const saHz = () => midiHz(state.saMidi);
+const noteHz = n => saHz()*Math.pow(2, n.c/1200);
+
+/* =====================================================================
+   Audio: tanpura + reference tones
+   ===================================================================== */
+let ac=null, master, tanBus, toneBus, harmonium, refAn;
+function audio(){
+  if(!ac){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ac = new AC();
+    master = ac.createGain(); master.gain.value = .9;
+    const comp = ac.createDynamicsCompressor();
+    master.connect(comp); comp.connect(ac.destination);
+    refAn = ac.createAnalyser(); refAn.fftSize = 8192; refAn.smoothingTimeConstant = 0; comp.connect(refAn);
+    tanBus = ac.createGain(); tanBus.gain.value = state.vol; tanBus.connect(master);
+    toneBus = ac.createGain(); toneBus.gain.value = .5; toneBus.connect(master);
+    harmonium = ac.createPeriodicWave(new Float32Array(9),
+      new Float32Array([0,1,.55,.38,.25,.16,.1,.06,.03]));
+  }
+  if(ac.state === 'suspended') ac.resume();
+  return ac;
+}
+
+/* One tanpura string: additive synthesis. Upper partials bloom after the
+   attack and then fade, which is the shimmering "jawari" of the bridge. */
+const tanCache = new Map();
+function tanBuffer(freq){
+  const key = freq.toFixed(2);
+  if(tanCache.has(key)) return tanCache.get(key);
+  const sr = ac.sampleRate, dur = 7, n = Math.floor(sr*dur);
+  const buf = ac.createBuffer(1, n, sr), d = buf.getChannelData(0);
+  const H = Math.max(6, Math.min(26, Math.floor(7500/freq)));
+  for(let k=1;k<=H;k++){
+    const fk = freq*k*(1 + 0.00002*k*k);
+    const jaw = 1 + 1.8*Math.exp(-Math.pow((k-8)/4.5, 2));
+    const amp = jaw/Math.pow(k, .9);
+    const decay = 6.5/(1 + .11*k);
+    const f = Math.exp(-1/(decay*sr));
+    const swell = Math.max(8, Math.floor((.012*Math.pow(k,1.15) + .004)*sr));
+    const w = 2*Math.PI*fk/sr, ph = Math.random()*6.283;
+    let e = 1;
+    for(let i=0;i<n;i++){
+      d[i] += amp*e*Math.min(1, i/swell)*Math.sin(w*i + ph);
+      e *= f;
+    }
+  }
+  let pk = 0; for(let i=0;i<n;i++){ const a = Math.abs(d[i]); if(a>pk) pk=a; }
+  const g = .8/(pk||1), fade = Math.floor(sr*.25);
+  for(let i=0;i<n;i++){ d[i] *= g * (i > n-fade ? (n-i)/fade : 1); }
+  tanCache.set(key, buf);
+  if(tanCache.size > 9) tanCache.delete(tanCache.keys().next().value);
+  return buf;
+}
+
+/* Classic order: Pa (lower), Sa, Sa, Sa (lower). */
+const STRINGS = [{r:.75,pan:-.25,g:.9},{r:1,pan:.1,g:1},{r:1,pan:-.1,g:1},{r:.5,pan:.25,g:1.1}];
+let tanTimer=null, tanNext=0, tanIdx=0;
+function pulseString(i){
+  $$('.strings').forEach(box => {
+    const el = box.children[i]; if(!el) return;
+    el.classList.remove('p'); void el.offsetWidth; el.classList.add('p');
+  });
+}
+function schedTan(){
+  const step = state.cycle/4;
+  while(tanNext < ac.currentTime + .35){
+    const s = STRINGS[tanIdx%4], idx = tanIdx%4;
+    const src = ac.createBufferSource();
+    src.buffer = tanBuffer(saHz()*s.r);
+    const g = ac.createGain(); g.gain.value = s.g*.55;
+    let out = g;
+    if(ac.createStereoPanner){ const p = ac.createStereoPanner(); p.pan.value = s.pan; g.connect(p); out = p; }
+    src.connect(g); out.connect(tanBus); src.start(tanNext);
+    setTimeout(() => pulseString(idx), Math.max(0,(tanNext - ac.currentTime)*1000));
+    tanIdx++; tanNext += step;
+  }
+}
+function startTanpura(){
+  audio();
+  tanBus.gain.cancelScheduledValues(ac.currentTime);
+  tanBus.gain.setValueAtTime(state.vol, ac.currentTime);
+  [.75,1,.5].forEach(r => tanBuffer(saHz()*r));
+  state.tanpura = true; tanNext = ac.currentTime + .1; tanIdx = 0;
+  tanTimer = setInterval(schedTan, 100); schedTan(); renderTanpura();
+}
+function stopTanpura(){
+  state.tanpura = false; clearInterval(tanTimer); tanTimer = null;
+  if(ac){ tanBus.gain.cancelScheduledValues(ac.currentTime); tanBus.gain.setTargetAtTime(0, ac.currentTime, .35); }
+  renderTanpura();
+}
+function toggleTanpura(){
+  state.tanpura ? stopTanpura() : startTanpura();
+  state.gate = .012; state.needCal = true; state.spk = null;
+  const run = state.run;
+  if(run && run.status === 'running' && state.out === 'speaker' && state.tanpura){
+    pauseRun();
+    setMsg('Tanpura started. Press Resume and stay quiet for a moment so it can tune out the drone.');
+  }
+}
+
+function playTone(freq, start, dur, vol=.55){
+  audio();
+  const o = ac.createOscillator(); o.setPeriodicWave(harmonium); o.frequency.value = freq;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, start);
+  g.gain.linearRampToValueAtTime(vol, start+.04);
+  g.gain.setValueAtTime(vol, Math.max(start+.05, start+dur-.1));
+  g.gain.linearRampToValueAtTime(0, start+dur);
+  o.connect(g); g.connect(toneBus); o.start(start); o.stop(start+dur+.03);
+  return {o,g,end:start+dur+.05};
+}
+
+/* =====================================================================
+   Microphone + YIN pitch detection
+   ===================================================================== */
+/*YIN-START*/
+function yin(buf, sr, gate){
+  if(gate == null) gate = .012;
+  const W = 2048;
+  const tauMax = Math.min(Math.floor(sr/65), buf.length - W - 1);
+  const tauMin = Math.max(2, Math.floor(sr/1100));
+  let e = 0;
+  for(let i=0;i<W;i++) e += buf[i]*buf[i];
+  const rms = Math.sqrt(e/W);
+  if(rms < gate) return null;
+  const cm = new Float32Array(tauMax+1);
+  cm[0] = 1;
+  let run = 0;
+  for(let tau=1; tau<=tauMax; tau++){
+    let s = 0;
+    for(let j=0;j<W;j++){ const x = buf[j] - buf[j+tau]; s += x*x; }
+    run += s;
+    cm[tau] = s*tau/(run || 1);
+  }
+  let tau = tauMin, found = -1;
+  while(tau < tauMax){
+    if(cm[tau] < .13){
+      while(tau+1 < tauMax && cm[tau+1] < cm[tau]) tau++;
+      found = tau; break;
+    }
+    tau++;
+  }
+  if(found < 0) return null;
+  const x0 = cm[found-1], x1 = cm[found], x2 = cm[found+1];
+  const den = 2*(x0 - 2*x1 + x2);
+  const better = den ? found + (x0 - x2)/den : found;
+  return {f: sr/better, clarity: 1 - cm[found], rms};
+}
+/*YIN-END*/
+
+/* Speaker mode: subtract what the tanpura is playing (known exactly) from the
+   mic spectrum, then find the voice's harmonic comb in what is left. */
+/*SPK-START*/
+const SPK = {beta:1.35, kappa:3, share:.2};
+const SPK_W = [1,.9,.8,.7,.6,.5,.4,.3];
+function spkNew(sr, N){
+  const nb = N/2, df = sr/N;
+  return {sr, N, nb, df,
+    kLo:Math.max(4, Math.ceil(60/df)), kHi:Math.min(nb-6, Math.floor(1600/df)),
+    g:new Float32Array(nb).fill(1), gMed:1, n0:0, gate:0, calN:0, ready:false,
+    sm:new Float64Array(nb), sx:new Float64Array(nb),
+    R:new Float32Array(nb), AR:new Float32Array(nb), D:new Float32Array(nb)};
+}
+function spkAdd(s, Pm, Px){
+  for(let k=s.kLo-3;k<=s.kHi+3;k++){ s.sm[k] += Pm[k]; s.sx[k] += Px[k]; }
+  s.calN++;
+}
+function spkFinish(s){
+  const k0 = s.kLo-3, k1 = s.kHi+3; let mx = 0;
+  for(let k=k0;k<=k1;k++) if(s.sx[k] > mx) mx = s.sx[k];
+  const thr = mx*.003, rat = [];
+  for(let k=k0;k<=k1;k++) if(s.sx[k] > thr) rat.push(s.sm[k]/s.sx[k]);
+  rat.sort((a,b) => a-b);
+  s.gMed = rat.length ? rat[rat.length>>1] : 1;
+  for(let k=0;k<s.nb;k++){
+    s.g[k] = (k>=k0 && k<=k1 && s.sx[k] > thr)
+      ? Math.min(s.gMed*16, Math.max(s.gMed/16, s.sm[k]/s.sx[k])) : s.gMed;
+  }
+  const nz = [];
+  for(let k=k0;k<=k1;k++) nz.push(Math.max(0, s.sm[k] - s.g[k]*s.sx[k])/s.calN);
+  nz.sort((a,b) => a-b); s.n0 = nz[nz.length>>1];
+  s.ready = true;
+}
+/* Pm: mic power spectrum, Px: reference (what the tanpura is playing), already
+   max-held over the last few frames to allow for the speaker-to-mic delay. */
+function spkResid(s, Pm, Px){
+  const b = SPK.beta, c = SPK.kappa*s.n0; let tot = 0;
+  for(let k=s.kLo-3;k<=s.kHi+3;k++){
+    const d = s.g[k]*Px[k]; s.D[k] = d;
+    let r = Pm[k] - b*d - c; if(r < 0) r = 0;
+    s.R[k] = r; s.AR[k] = Math.sqrt(r);
+    if(k >= s.kLo && k <= s.kHi) tot += r;
+  }
+  return tot;
+}
+function spkLin(A, x){ const k = Math.floor(x), t = x - k; return A[k]*(1-t) + A[k+1]*t; }
+function spkSal(s, f0, lerp){
+  const AR = s.AR, df = s.df; let S = 0;
+  for(let j=1;j<=8;j++){
+    const f = j*f0, fh = (j-.5)*f0;
+    if(f/df > s.kHi-1) break;
+    let a, h;
+    if(lerp){ a = spkLin(AR, f/df); h = spkLin(AR, fh/df); }
+    else {
+      const k = Math.round(f/df), kh = Math.round(fh/df);
+      a = Math.max(AR[k-1], AR[k], AR[k+1]); h = Math.max(AR[kh-1], AR[kh], AR[kh+1]);
+    }
+    S += SPK_W[j-1]*(a - .5*h);
+  }
+  return S;
+}
+function spkShare(s, f0){
+  let near = 0, tot = 0;
+  for(let j=1;j<=8;j++){
+    const k = Math.round(j*f0/s.df); if(k+2 > s.kHi) break;
+    for(let d=-2;d<=2;d++) near += s.AR[k+d];
+  }
+  for(let k=s.kLo;k<=s.kHi;k++) tot += s.AR[k];
+  return tot > 0 ? near/tot : 0;
+}
+function spkRefine(s, f0){
+  const R = s.R, df = s.df; let num = 0, den = 0, n = 0;
+  for(let j=1;j<=8;j++){
+    const kc = Math.round(j*f0/df); if(kc+2 > s.kHi) break;
+    let km = kc, best = R[kc];
+    for(let d=-2;d<=2;d++) if(R[kc+d] > best){ best = R[kc+d]; km = kc+d; }
+    if(km <= s.kLo || km >= s.kHi) continue;
+    if(!(R[km] > R[km-1] && R[km] >= R[km+1])) continue;
+    if(R[km] < 8*s.n0) continue;
+    if(Math.max(s.D[km-1], s.D[km], s.D[km+1]) > .5*R[km]) continue;
+    const a = Math.log(R[km-1] + 1e-30), b = Math.log(R[km]), c = Math.log(R[km+1] + 1e-30);
+    const q = a - 2*b + c; if(q >= 0) continue;
+    const fj = (km + .5*(a-c)/q)*df, w = R[km];
+    num += w*j*fj; den += w*j*j; n++;
+  }
+  return n ? num/den : null;
+}
+/* returns {f, share} or null */
+function spkPitch(s){
+  let bi = -1, bs = 0;
+  for(let f0=70; f0<=1000; f0 *= 1.00347){
+    const v = spkSal(s, f0, false);
+    if(v > bs){ bs = v; bi = f0; }
+  }
+  if(bi < 0) return null;
+  let bc = 0, bv = -1e30; const vals = [];
+  for(let c=-14;c<=14;c++){
+    const v = spkSal(s, bi*Math.pow(2,c/1200), true); vals.push(v);
+    if(v > bv){ bv = v; bc = c; }
+  }
+  let cfine = bc;
+  const ix = bc + 14;
+  if(ix > 0 && ix < vals.length-1){
+    const a = vals[ix-1], b = vals[ix], c2 = vals[ix+1], q = a - 2*b + c2;
+    if(q < 0) cfine = bc + .5*(a-c2)/q;
+  }
+  let f = bi*Math.pow(2, cfine/1200);
+  const share = spkShare(s, f);
+  const ls = spkRefine(s, f);
+  if(ls && Math.abs(1200*Math.log2(ls/f)) < 60) f = ls;
+  return {f, share};
+}
+/*SPK-END*/
+
+
+async function enableMic(){
+  if(state.mic) return true;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    state.micState = 'unsupported'; renderMic(); return false;
+  }
+  try{
+    audio();
+    /* Browser echo cancellation treats the tanpura as an echo and also removes a
+       voice that sounds like it, so the raw microphone is used. */
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    const src = ac.createMediaStreamSource(stream);
+    const an = ac.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0;
+    src.connect(an);
+    const spec = ac.createAnalyser(); spec.fftSize = 8192; spec.smoothingTimeConstant = 0; src.connect(spec);
+    state.mic = {stream, an, spec, buf:new Float32Array(an.fftSize)};
+    state.micState = 'on';
+  }catch(err){
+    state.micState = (err && err.name === 'NotAllowedError') ? 'denied' : 'error';
+  }
+  renderMic();
+  return state.micState === 'on';
+}
+
+function closeMic(){
+  if(state.mic){ try{ state.mic.stream.getTracks().forEach(t => t.stop()); }catch(e){} }
+  state.mic = null; state.micState = 'off'; renderMic();
+}
+/* ---- speaker-mode frames ---- */
+const NB = 4096, specM = new Float32Array(NB), specX = new Float32Array(NB);
+const pm = new Float32Array(NB), px = new Float32Array(NB), pmax = new Float32Array(NB);
+const pxRing = Array.from({length:8}, () => new Float32Array(NB)); let ringI = 0, ringN = 0;
+function specFrame(){
+  const s = state.spk;
+  state.mic.spec.getFloatFrequencyData(specM); refAn.getFloatFrequencyData(specX);
+  for(let k=s.kLo-3;k<=s.kHi+3;k++){
+    pm[k] = Math.pow(10, Math.max(specM[k], -200)/10);
+    px[k] = Math.pow(10, Math.max(specX[k], -200)/10);
+  }
+  pxRing[ringI].set(px); ringI = (ringI+1) % 8; ringN = Math.min(8, ringN+1);
+  /* hold the peak of the last ~0.3 s: the mic hears the speaker slightly late */
+  for(let k=s.kLo-3;k<=s.kHi+3;k++){
+    let v = 0; for(let r=0;r<ringN;r++) if(pxRing[r][k] > v) v = pxRing[r][k];
+    pmax[k] = v;
+  }
+}
+const spkActive = () => state.out === 'speaker' && state.tanpura && state.spk && state.spk.ready && refAn;
+function detectSpk(){
+  const s = state.spk; specFrame();
+  if(spkResid(s, pm, pmax) < s.gate) return null;
+  const p = spkPitch(s);
+  if(!p || p.share < SPK.share) return null;
+  return 1200*Math.log2(p.f/saHz());
+}
+function startCal(){
+  state.spk = spkNew(ac.sampleRate, 8192); ringN = 0; ringI = 0;
+}
+/* phase 1 (1.2 s): learn how loud each drone partial is at the mic.
+   phase 2 (0.4 s): measure what is left over, which sets the voice gate. */
+function calStep(run, dt){
+  const s = state.spk;
+  if(!s || !state.tanpura || !refAn){ run.status = 'running'; updateControls(); kick(); return; }
+  specFrame(); run.calT += dt;
+  if(run.calT < 1.2){ spkAdd(s, pm, px); return; }
+  if(!s.ready){ spkFinish(s); s.gate = 0; run.rb = 0; }
+  run.rb = Math.max(run.rb, spkResid(s, pm, pmax));
+  if(run.calT >= 1.6){
+    s.gate = Math.max(2.5*run.rb, 1e-30); state.needCal = false;
+    run.status = 'running'; updateControls();
+    setMsg('Listening. Sing each swara and hold it steady inside the band. If it misses you, turn the tanpura volume down a little.');
+      kick();
+  }
+}
+
+const hist = []; let missing = 0;
+const median = a => { const s = [...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+function detect(){
+  const m = state.mic; if(!m) return null;
+  let c = null;
+  if(spkActive()) c = detectSpk();
+  else {
+    m.an.getFloatTimeDomainData(m.buf);
+    const r = yin(m.buf, ac.sampleRate, state.gate);
+    if(r) c = 1200*Math.log2(r.f/saHz());
+  }
+  if(c == null){ missing++; if(missing > 4) hist.length = 0; return hist.length ? median(hist) : null; }
+  missing = 0;
+  hist.push(c);
+  if(hist.length > 5) hist.shift();
+  return median(hist);
+}
+function nearest(c){
+  const m = ((c%1200)+1200)%1200; let best = null;
+  for(const k of ORDER){
+    const d = wrap(m - SW[k].c);
+    if(!best || Math.abs(d) < Math.abs(best.d)) best = {k, n:SW[k].n, d};
+  }
+  return best;
+}
+
+/* =====================================================================
+   Lesson engine
+   ===================================================================== */
+const errTo = (c, target) => state.any ? wrap(c - target) : c - target;
+
+function resetRun(){
+  freeStop();
+  const L = state.lesson;
+  const cs = L.notes.map(n => n.c);
+  let lo = Math.min(...cs) - 170, hi = Math.max(...cs) + 170;
+  if(hi - lo < 560){ const mid = (hi+lo)/2; lo = mid-280; hi = mid+280; }
+  const ladder = new Map();
+  L.notes.forEach(n => {
+    const key = Math.round(n.c);
+    if(!ladder.has(key)) ladder.set(key, {c:n.c, label:SW[n.k].n + (n.oct>0?'′':n.oct<0?'.':''), sa:n.k==='S'});
+  });
+  [-1200,0,1200].forEach(c => { if(c>=lo && c<=hi && !ladder.has(c)) ladder.set(c, {c, label:'Sa'+(c>0?'′':c<0?'.':''), sa:true}); });
+  state.run = {i:0, hold:0, sum:0, ssum:0, lost:0, armed:true, prevC:0, status:'idle', prevStatus:'idle',
+    elapsed:0, errs:[], trace:[], cur:null, lo, hi, ladder:[...ladder.values()], tapUsed:false,
+    phase:null, phaseT:0, callT:0, rz:{round:0, roundScores:[], phase:null, slotRes:[], stat:[], fresh:true}};
+  hist.length = 0;
+}
+
+function score(c, dt){
+  const run = state.run, L = state.lesson, note = L.notes[run.i];
+  const e = c == null ? null : errTo(c, note.c);
+  if(!run.armed){
+    const pe = c == null ? null : errTo(c, run.prevC);
+    if(c == null || Math.abs(pe) > L.tol*1.3) run.armed = true;
+  }
+  if(run.armed && e != null && Math.abs(e) <= L.tol){
+    run.hold += dt; run.sum += Math.abs(e)*dt; run.ssum += e*dt; run.lost = 0;
+  } else {
+    run.lost += dt;
+    if(run.lost > .3){ run.hold = 0; run.sum = 0; run.ssum = 0; }
+  }
+  if(run.hold >= L.hold) completeNote(run.sum/run.hold, run.ssum/run.hold);
+}
+function completeNote(abs, signed){
+  const run = state.run, L = state.lesson;
+  const tile = $('#tiles .tile[data-i="'+run.i+'"]');
+  run.errs.push({abs, signed});
+  run.prevC = L.notes[run.i].c;
+  run.i++; run.hold = run.sum = run.ssum = run.lost = 0; run.armed = false;
+  if(tile){ tile.classList.remove('pop'); void tile.offsetWidth; tile.classList.add('pop'); }
+  if(run.i >= L.notes.length) finish();
+  else {
+    updateTiles();
+    if(state.mode === 'practice' && run.status === 'running') startCall(.35);
+    else if(state.mode === 'test' && L.notes[run.i].c === L.notes[run.i-1].c) setMsg('Same swara again. Take a short breath, then sing it once more.');
+  }
+}
+
+function touchStreak(){
+  const today = new Date().toDateString();
+  if(state.last !== today){
+    const y = new Date(Date.now() - 864e5).toDateString();
+    state.streak = state.last === y ? state.streak + 1 : 1;
+    state.last = today;
+  }
+}
+function setLabels(a, b, c){ $('#rDevL').textContent = a; $('#rTimeL').textContent = b; $('#rNotesL').textContent = c; }
+
+/* practice and test */
+function finish(){
+  const run = state.run, L = state.lesson, test = state.mode === 'test';
+  run.status = 'done'; run.phase = null; stopTones(); updateTiles(); updateControls();
+  const mean = avg(run.errs.map(e => e.abs));
+  const bias = avg(run.errs.map(e => e.signed));
+  let stars = 0;
+  if(test){
+    stars = mean <= 15 ? 3 : mean <= 28 ? 2 : 1;
+    if(run.tapUsed) stars = 1;
+    state.stars[L.id] = Math.max(state.stars[L.id]||0, stars);
+  }
+  touchStreak(); persist(); renderTop();
+
+  setLabels('Off pitch', 'Time', 'Swaras');
+  $('#rStars').hidden = !test;
+  if(test) $('#rStars').innerHTML = [1,2,3].map(i => starSVG(i <= stars)).join('');
+  $('#rTitle').textContent = test
+    ? (stars === 3 ? 'Beautifully steady' : stars === 2 ? 'Nicely done' : 'Test complete')
+    : (mean <= 15 && !run.tapUsed ? 'Steady and true' : 'Practice complete');
+  $('#rSub').textContent = L.title + (run.tapUsed ? ' · tap mode, sing it for a real score' : '');
+  $('#rDev').textContent = run.tapUsed ? '—' : Math.round(mean) + '¢';
+  $('#rTime').textContent = fmtT(run.elapsed);
+  $('#rNotes').textContent = L.notes.length;
+  $('#rList').innerHTML = L.notes.map((n,i) => {
+    const e = run.errs[i], a = e ? e.abs : 0;
+    const cls = a <= 15 ? 'g3' : a <= 28 ? 'g2' : 'g1';
+    const sg = e ? Math.round(e.signed) : 0;
+    return '<div class="rt '+cls+'"><span class="g">'+SW[n.k].d+'</span><b>'+(run.tapUsed ? '·' : (sg>0?'+':sg<0?'−':'')+Math.abs(sg))+'</b></div>';
+  }).join('');
+  $('#rBias').textContent = (run.tapUsed ? '' :
+    bias > 8 ? 'You tended to land a little sharp. Ease the pitch down as you settle.' :
+    bias < -8 ? 'You tended to land a little flat. Think of lifting the note slightly.' :
+    'No lean sharp or flat. Your pitch sat right on the swaras.')
+    + (test ? '' : ' When you feel ready, take the test to earn stars and unlock the next lesson.');
+  const next = LESSONS[L.id+1], nx = $('#rNext');
+  if(test){ nx.hidden = !next; nx.dataset.act = 'next'; nx.textContent = 'Next lesson'; }
+  else { nx.hidden = false; nx.dataset.act = 'test'; nx.textContent = 'Take the test'; }
+  $('#rRetry').textContent = test ? 'Try again' : 'Practise again';
+  $('#result').hidden = false;
+  (nx.hidden ? $('#rRetry') : nx).focus();
+}
+
+/* riyaz */
+function finishRiyaz(){
+  const run = state.run, rz = run.rz, L = state.lesson, rs = rz.roundScores;
+  run.status = 'done'; rz.phase = null; stopTones(); updateControls();
+  touchStreak(); persist(); renderTop();
+  const best = Math.max(...rs.map(r => r.pct));
+  const first = rs[0].pct, last = rs[rs.length-1].pct;
+  const bias = avg(rs.map(r => r.bias));
+  setLabels('Best round', 'Time', 'Rounds');
+  $('#rStars').hidden = true;
+  $('#rTitle').textContent = 'Riyaz complete';
+  $('#rSub').textContent = L.title + ' · ' + state.tempo + ' bpm';
+  $('#rDev').textContent = Math.round(best*100) + '%';
+  $('#rTime').textContent = fmtT(run.elapsed);
+  $('#rNotes').textContent = rs.length;
+  $('#rList').innerHTML = rs.map((r,i) => {
+    const cls = r.pct >= .8 ? 'g3' : r.pct >= .5 ? 'g1' : 'g0';
+    return '<div class="rt '+cls+'"><span class="g">R'+(i+1)+'</span><b>'+Math.round(r.pct*100)+'%</b></div>';
+  }).join('');
+  let t = rs.length < 2 ? '' :
+    last > first ? 'Your last round was better than your first. That is the riyaz working. ' :
+    last < first ? 'Your last round dipped below your first. Rest your voice, then try a slower tempo. ' :
+    'You held the same level through every round. ';
+  t += bias > 8 ? 'On the notes you hit, you leaned a little sharp.' : bias < -8 ? 'On the notes you hit, you leaned a little flat.' : '';
+  $('#rBias').textContent = t;
+  $('#rNext').hidden = true;
+  $('#rRetry').textContent = 'Another session';
+  $('#result').hidden = false;
+  $('#rRetry').focus();
+}
+
+/* listen to the reference phrase */
+let listenNodes = [], listenTimers = [];
+function stopTones(){
+  listenTimers.forEach(clearTimeout); listenTimers = [];
+  listenNodes.forEach(x => { try{ x.o.stop(); x.o.disconnect(); }catch(e){} }); listenNodes = [];
+  $$('#tiles .tile.hear').forEach(t => t.classList.remove('hear'));
+}
+function stopListen(){
+  stopTones();
+  const run = state.run;
+  if(run && run.status === 'listening'){ run.status = run.prevStatus === 'running' ? 'running' : (run.prevStatus === 'paused' ? 'paused' : 'idle'); updateControls(); }
+}
+function listen(){
+  const run = state.run, L = state.lesson;
+  if(run.status === 'listening'){ stopListen(); return; }
+  if(run.status === 'done') return;
+  audio();
+  run.prevStatus = run.status; run.status = 'listening'; updateControls();
+  const per = Math.max(.55, L.hold + .1), t0 = ac.currentTime + .1;
+  L.notes.forEach((n,i) => {
+    listenNodes.push(playTone(noteHz(n), t0 + i*per, per*.92));
+    listenTimers.push(setTimeout(() => {
+      $$('#tiles .tile').forEach((t,j) => t.classList.toggle('hear', j === i));
+    }, (t0 - ac.currentTime + i*per)*1000));
+  });
+  listenTimers.push(setTimeout(stopListen, (t0 - ac.currentTime + L.notes.length*per + .1)*1000));
+}
+
+/* ---- modes ---- */
+const MODES = {
+  practice:{name:'Practice',
+    desc:'The app plays each swara, then waits for you to sing it back. Take your time. Stars come from the test.',
+    msg:'You will hear each swara, then it is your turn. Wait for the tone to finish before you sing.',
+    hint:'Press “Start practice”. You hear a swara, then sing it back. Your voice draws a line here; hold it inside the saffron band.'},
+  test:{name:'Test',
+    desc:'No notes are played. Sing the whole sequence from the tiles. Stars and the next lesson unlock here.',
+    msg:'No notes are played in the test. Sing each swara from its tile. Headphones help.',
+    hint:'Press “Start singing”. Sing each swara on the tiles from memory and hold it inside the saffron band.'},
+  riyaz:{name:'Riyaz',
+    desc:'A practice session. The app plays the phrase, you sing it back in time, and it repeats for several rounds.',
+    msg:'The phrase plays once, then you sing it back in time with the beat. Switch on the tanpura and settle into Sa first.',
+    hint:'Press “Start riyaz”. Listen to the phrase, then sing it back in time. Each round is scored.'}
+};
+const FREE = {
+  desc:'The phrase loops and keeps playing on a scrolling piano roll. Sing or play along as long as you like, with or without the tanpura. No microphone and no scoring.',
+  msg:'The phrase loops. Switch on the tanpura below if you like, press Play loop, and practise at your own pace.'
+};
+const modeMsg = () => isFree() ? FREE.msg : MODES[state.mode].msg;
+function applyMode(){
+  const m = state.mode, M = MODES[m], free = isFree();
+  $$('.js-mode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === m)));
+  $$('.js-free').forEach(c => { c.hidden = m !== 'practice'; });
+  $$('.js-free button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === state.free)));
+  $('#modeDesc').textContent = free ? FREE.desc : M.desc;
+  $('#rzSet').hidden = !(m === 'riyaz' || free);
+  $('#roundsField').hidden = m !== 'riyaz';
+  $('#soundField').hidden = !free;
+  $('#readBox').hidden = free;
+  $('details.tap').hidden = m === 'riyaz' || free;
+  $('details.tap summary').textContent = m === 'test' ? 'No microphone? Tap the swaras instead (earns 1 star)' : 'No microphone? Tap the swaras instead';
+  $('#graphHint').textContent = M.hint;
+  if(free && state.mic) closeMic();
+  if(state.run) updateControls();
+}
+function setFree(v){
+  v = !!v; if(v === state.free) return;
+  const onPractice = !$('#practice').hidden;
+  if(onPractice) stopListen();
+  state.free = v; persist();
+  applyMode();
+  if(onPractice){ resetRun(); renderPractice(); setMsg(modeMsg()); }
+}
+function setMode(m){
+  if(m === state.mode) return;
+  const onPractice = !$('#practice').hidden;
+  if(onPractice) stopListen();
+  state.mode = m; persist();
+  if(onPractice){ resetRun(); renderPractice(); setMsg(modeMsg()); }
+  applyMode();
+}
+
+/* Practice: the app plays a swara, then waits for you to sing it back. */
+function startCall(lead){
+  const run = state.run, L = state.lesson, n = L.notes[run.i];
+  audio(); stopTones();
+  const dur = Math.max(1, L.hold + .5);
+  run.phase = 'call'; run.phaseT = 0; run.callT = lead + dur + .3;
+  run.hold = run.sum = run.ssum = run.lost = 0; hist.length = 0;
+  listenNodes.push(playTone(noteHz(n), ac.currentTime + lead, dur));
+  $$('#tiles .tile').forEach((t,j) => t.classList.toggle('hear', j === run.i));
+  setMsg('Listen to ' + SW[n.k].n + '…');
+}
+function practiceTick(run, dt){
+  if(!run.phase) return;
+  run.phaseT += dt;
+  if(run.phase === 'call'){
+    if(run.phaseT >= run.callT){
+      run.phase = 'sing'; run.phaseT = 0; run.armed = true;
+      run.hold = run.sum = run.ssum = run.lost = 0; hist.length = 0;
+      $$('#tiles .tile.hear').forEach(t => t.classList.remove('hear'));
+      setMsg('Your turn. Sing ' + SW[state.lesson.notes[run.i].k].n + ' and hold it.');
+    }
+  } else if(run.phaseT > 8 && run.hold < .05){
+    startCall(.2);
+  }
+}
+
+/* Riyaz: the app plays the whole phrase, you sing it back in time, repeat. */
+function rzTimes(L, bl){
+  const starts = []; let t = 0, g = L.notes[0].grp;
+  L.notes.forEach(n => { if(n.grp !== g){ t += .5*bl; g = n.grp; } starts.push(t); t += bl; });
+  return {starts, total:t};
+}
+const rzIdx = (rz, t) => { for(let j=0;j<rz.starts.length;j++) if(t < rz.starts[j] + rz.bl) return j; return rz.starts.length - 1; };
+const rzIn = (rz, t, j) => t >= rz.starts[j] && t < rz.starts[j] + rz.bl;
+function rzReset(rz, L){ rz.stat = L.notes.map(() => ({n:0, ok:0, sa:0, ss:0})); rz.slotRes = []; }
+function rzStartCall(lead){
+  const run = state.run, L = state.lesson, rz = run.rz;
+  audio(); stopTones();
+  const bl = 60/state.tempo, T = rzTimes(L, bl);
+  rz.bl = bl; rz.starts = T.starts; rz.total = T.total; rz.phase = 'call'; rz.fresh = false;
+  rz.t0 = ac.currentTime + (lead == null ? .3 : lead);
+  hist.length = 0;
+  L.notes.forEach((n,i) => listenNodes.push(playTone(noteHz(n), rz.t0 + T.starts[i], bl*.94)));
+  setMsg((rz.note || '') + 'Round ' + (rz.round+1) + ' of ' + state.rounds + '. Listen to the phrase…');
+  rz.note = '';
+}
+function rzStartSing(){
+  const run = state.run, rz = run.rz;
+  rz.phase = 'sing'; rz.t0 = ac.currentTime + rz.bl; rzReset(rz, state.lesson);
+  hist.length = 0; run.i = 0;
+  $$('#tiles .tile.hear').forEach(t => t.classList.remove('hear')); updateTiles();
+  setMsg('Your turn. Sing it back in time with the beat.');
+}
+function rzFinalize(j){
+  const rz = state.run.rz, st = rz.stat[j];
+  rz.slotRes[j] = {hit: st.n > 0 && st.ok/st.n >= .5, abs: st.ok ? st.sa/st.ok : 0, signed: st.ok ? st.ss/st.ok : 0};
+}
+function rzEndRound(){
+  const run = state.run, rz = run.rz, L = state.lesson;
+  L.notes.forEach((n,j) => { if(!rz.slotRes[j]) rzFinalize(j); });
+  const rs = rz.slotRes, hits = rs.filter(r => r.hit), pct = hits.length/rs.length;
+  rz.roundScores.push({pct, mean:avg(hits.map(r => r.abs)), bias:avg(hits.map(r => r.signed))});
+  rz.round++; updateTiles();
+  if(rz.round >= state.rounds) finishRiyaz();
+  else { rz.note = 'Round ' + rz.round + ': ' + Math.round(pct*100) + '% on pitch. '; rzStartCall(1.4); }
+}
+function riyazTick(run){
+  const rz = run.rz; if(!rz.phase || !ac) return;
+  const t = ac.currentTime - rz.t0, len = state.lesson.notes.length;
+  if(rz.phase === 'call'){
+    if(t >= 0 && !rz.fresh){ rz.fresh = true; rzReset(rz, state.lesson); run.i = 0; updateTiles(); }
+    if(t >= 0) run.i = rzIdx(rz, t);
+    $$('#tiles .tile').forEach((e, k) => e.classList.toggle('hear', t >= 0 && rzIn(rz, t, k)));
+    $('#pBar').style.width = (rz.round/state.rounds*100) + '%';
+    if(t >= rz.total + .35) rzStartSing();
+  } else {
+    let changed = false;
+    for(let j=0;j<len;j++) if(!rz.slotRes[j] && t >= rz.starts[j] + rz.bl){ rzFinalize(j); changed = true; }
+    const idx = rzIdx(rz, t);
+    if(idx !== run.i){ run.i = idx; changed = true; }
+    if(changed) updateTiles();
+    $('#pBar').style.width = ((rz.round + clamp(t/rz.total, 0, 1))/state.rounds*100) + '%';
+    if(t >= rz.total + .05) rzEndRound();
+  }
+}
+function riyazScore(c, dt){
+  const run = state.run, rz = run.rz, L = state.lesson;
+  if(rz.phase !== 'sing' || !ac) return;
+  const t = ac.currentTime - rz.t0, j = rzIdx(rz, t);
+  if(!rzIn(rz, t, j) || t - rz.starts[j] < .25*rz.bl) return;
+  const st = rz.stat[j], e = c == null ? null : errTo(c, L.notes[j].c);
+  st.n += dt;
+  if(e != null && Math.abs(e) <= L.tol*1.15){ st.ok += dt; st.sa += Math.abs(e)*dt; st.ss += e*dt; }
+}
+function scoreDispatch(c, dt){
+  const run = state.run;
+  if(state.mode === 'riyaz') riyazScore(c, dt);
+  else if(state.mode === 'practice'){ if(run.phase === 'sing') score(c, dt); }
+  else score(c, dt);
+}
+function kick(){
+  const run = state.run;
+  if(state.mode === 'practice' && !run.phase) startCall(.15);
+  else if(state.mode === 'riyaz' && !run.rz.phase) rzStartCall(.3);
+}
+function pauseRun(){
+  const run = state.run;
+  run.status = 'paused'; freeStop(); stopTones(); run.phase = null; if(run.rz) run.rz.phase = null;
+  updateControls();
+}
+
+/* Freehand: the phrase loops endlessly. No microphone, no scoring. */
+const isFree = () => state.mode === 'practice' && state.free;
+const fh = {timer:null, loops:[], next:0, n:0, shown:-1};
+function freeLoopInfo(L, bl){ const T = rzTimes(L, bl); return {bl, starts:T.starts, total:T.total, period:T.total + bl}; }
+function freeSchedule(){
+  if(!ac || !isFree()) return;
+  const L = state.lesson;
+  while(fh.next < ac.currentTime + .8){
+    const bl = 60/state.tempo, info = freeLoopInfo(L, bl), lp = Object.assign({t0:fh.next, n:fh.n++}, info);
+    fh.loops.push(lp);
+    if(state.freeSound) L.notes.forEach((n,i) => listenNodes.push(playTone(noteHz(n), lp.t0 + info.starts[i], bl*.94, .5)));
+    fh.next += info.period;
+  }
+  const now = ac.currentTime;
+  fh.loops = fh.loops.filter(l => l.t0 + l.period > now - 4);
+  listenNodes = listenNodes.filter(x => !x.end || x.end > now);
+}
+function freeStart(){
+  audio(); fh.loops = []; fh.n = 0; fh.shown = -1;
+  fh.next = ac.currentTime + .25;
+  clearInterval(fh.timer); fh.timer = setInterval(freeSchedule, 120); freeSchedule();
+}
+function freeStop(){ clearInterval(fh.timer); fh.timer = null; fh.loops = []; }
+function freeTick(run){
+  if(!ac) return;
+  const now = ac.currentTime;
+  const lp = fh.loops.find(l => now >= l.t0 && now < l.t0 + l.period);
+  let cur = -1;
+  if(lp){
+    const t = now - lp.t0;
+    for(let j=0;j<lp.starts.length;j++) if(t >= lp.starts[j] && t < lp.starts[j] + lp.bl){ cur = j; break; }
+    $('#pBar').style.width = (t/lp.period*100) + '%';
+    if(lp.n !== fh.shown){
+      fh.shown = lp.n;
+      setMsg('Loop ' + (lp.n+1) + ' · ' + state.tempo + ' bpm. ' + (state.freeSound ? 'Sing or play along with the notes.' : 'The notes are silent. Follow the roll and sing.'));
+    }
+  }
+  if(cur >= 0) run.i = cur;
+  $$('#tiles .tile').forEach((el_, k) => el_.classList.toggle('hear', k === cur));
+}
+
+async function startOrPause(){
+  const run = state.run;
+  if(isFree()){
+    if(run.status === 'running') pauseRun();
+    else { setMsg(''); audio(); run.status = 'running'; freeStart(); updateControls(); }
+    return;
+  }
+  if(run.status === 'running'){ pauseRun(); return; }
+  if(['listening','done','calibrating'].includes(run.status)) return;
+  setMsg('');
+  const ok = await enableMic();
+  if(!ok){
+    setMsg(state.micState === 'denied'
+      ? 'Microphone access was blocked. Allow it in your browser settings, or use the tap keys below.'
+      : 'No microphone available here. Use the tap keys below to try the lesson.', true);
+    if(state.mode === 'riyaz') return;
+  } else {
+    setMsg('Listening. Sing each swara and hold it steady inside the band.');
+  }
+  run.armed = true; run.hold = run.sum = run.ssum = run.lost = 0;
+  if(ok && state.out === 'speaker' && state.tanpura && state.needCal){
+    run.status = 'calibrating'; run.calT = 0; run.rb = 0; startCal();
+    setMsg('Stay quiet for a second while Riyaz learns the drone…');
+  } else { run.status = 'running'; kick(); }
+  updateControls();
+}
+
+function onTap(k){
+  const run = state.run, L = state.lesson;
+  if(!run || state.mode === 'riyaz' || run.status === 'listening' || run.status === 'done') return;
+  const note = L.notes[run.i];
+  playTone(noteHz({c:SW[k].c + (k === note.k ? 1200*note.oct : 0)}), audio().currentTime + .01, .7);
+  if(run.status !== 'running') run.status = 'running';
+  run.tapUsed = true; updateControls();
+  if(k === note.k) completeNote(0, 0);
+  else {
+    const t = $('#tiles .tile[data-i="'+run.i+'"]');
+    if(t){ t.classList.remove('bad'); void t.offsetWidth; t.classList.add('bad'); }
+  }
+}
+
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+function starSVG(on){
+  return '<svg class="star'+(on?' on':'')+'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.1 6.3 20.3l1.2-6.4L2.8 9.5l6.4-.8z" stroke-linejoin="round"/></svg>';
+}
+const lockSVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Locked"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+function tileHTML(n){
+  const s = SW[n.k], oct = n.oct>0 ? 'taar' : n.oct<0 ? 'mandra' : '';
+  return '<span class="g '+oct+' '+(s.kind||'')+'">'+s.d+'<i class="oc"></i><i class="vr"></i></span><span class="r">'+s.n+'</span>';
+}
+const unlocked = i => state.unlockAll || i === 0 || (state.stars[LESSONS[i-1].id]||0) >= 1;
+
+function renderTop(){
+  const total = LESSONS.length*3, got = LESSONS.reduce((a,l) => a + (state.stars[l.id]||0), 0);
+  $('#starTotal').textContent = '★ ' + got + ' / ' + total;
+  $('#streak').textContent = state.streak > 0 ? state.streak + '-day streak' : 'Start a streak';
+}
+function renderTanpura(){
+  $$('.js-tan').forEach(b => {
+    b.setAttribute('aria-pressed', String(state.tanpura));
+    $('.tl', b).textContent = state.tanpura ? 'Tanpura playing' : 'Start tanpura';
+  });
+}
+function renderSa(){
+  $('#saName').textContent = saLabel(state.saMidi);
+  $('#saHz').textContent = saHz().toFixed(1) + ' Hz';
+  $('#octVal').textContent = 'Octave ' + (Math.floor(state.saMidi/12)-1);
+  $$('#saChips .chip').forEach((c,i) => c.setAttribute('aria-pressed', String(i === state.saMidi%12)));
+  $('#saSel').value = String(state.saMidi);
+  $('#octDn').disabled = state.saMidi < 48; $('#octUp').disabled = state.saMidi > 59;
+}
+function renderMic(){
+  const b = $('#micBtn'), n = $('#micNote');
+  const m = {
+    off:['Enable microphone','dot','Used only on this page to hear your pitch. Nothing is recorded or sent anywhere.'],
+    on:['Microphone on','dot on','Listening for your voice. With the tanpura on a speaker, choose “Speaker” above so your voice can be separated from the drone.'],
+    denied:['Microphone blocked','dot bad','Allow microphone access in your browser settings, then try again. You can still use tap mode.'],
+    unsupported:['Microphone unavailable','dot bad','This browser or page cannot use the microphone (it needs https or a local file). Tap mode still works.'],
+    error:['Microphone unavailable','dot bad','No microphone could be opened. Check that one is connected, then try again.']
+  }[state.micState];
+  b.disabled = state.micState === 'on';
+  b.innerHTML = '<span class="'+m[1]+'"></span>'+m[0];
+  n.textContent = m[2];
+}
+function renderOut(){ $$('#outSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === state.out))); }
+function renderAny(){ $$('#anySeg button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === state.any))); }
+function renderSliders(){
+  $('#cycle').value = state.cycle; $('#cycleOut').textContent = state.cycle.toFixed(1) + ' s';
+  $('#vol').value = state.vol;
+  $('#tempo').value = state.tempo; $('#tempoOut').textContent = state.tempo + ' bpm';
+  $$('#soundSeg button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === state.freeSound)));
+  $$('#roundsSeg button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === state.rounds)));
+}
+
+function renderHome(){
+  renderTop();
+  const box = $('#stages'); box.innerHTML = '';
+  let nextFound = false;
+  STAGES.forEach((st, si) => {
+    const ls = LESSONS.filter(l => l.si === si);
+    const done = ls.filter(l => (state.stars[l.id]||0) >= 1).length;
+    const sec = document.createElement('section'); sec.className = 'stage';
+    sec.innerHTML = '<div class="stage-h"><h2>Stage '+(si+1)+' · '+st.name+'<span class="dev">'+st.dev+'</span></h2><span class="prog">'+done+' of '+ls.length+' lessons</span></div><p class="blurb">'+st.blurb+'</p>';
+    const grid = document.createElement('div'); grid.className = 'lessons';
+    ls.forEach(l => {
+      const s = state.stars[l.id]||0, open = unlocked(l.id);
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.id = l.id;
+      let cls = 'lesson';
+      if(s >= 1) cls += ' done'; else if(open && !nextFound){ cls += ' next'; nextFound = true; }
+      b.className = cls; b.disabled = !open;
+      const preview = l.notes.slice(0,9).map(n => SW[n.k].d).join(' ') + (l.notes.length > 9 ? ' …' : '');
+      b.innerHTML = '<span class="badge">'+(open ? (l.id+1) : lockSVG)+'</span>'
+        + '<span class="tt"><span class="t">'+l.title+'</span><span class="seq">'+preview+'</span>'
+        + (l.meta ? '<span class="meta">'+l.meta+'</span>' : '') + '</span>'
+        + '<span class="stars" aria-label="'+s+' of 3 stars">'+[1,2,3].map(i => starSVG(i <= s)).join('')+'</span>';
+      grid.appendChild(b);
+    });
+    sec.appendChild(grid); box.appendChild(sec);
+  });
+}
+
+function renderPractice(){
+  const L = state.lesson;
+  $('#pStage').textContent = MODES[state.mode].name + (isFree() ? ' · Freehand' : '') + ' · Stage ' + (L.si+1) + ' · ' + L.st.name;
+  $('#pTitle').textContent = L.title;
+  $('#pTip').textContent = L.tip;
+  $('#pMeta').textContent = L.meta; $('#pMeta').hidden = !L.meta;
+  const box = $('#tiles'); box.innerHTML = '';
+  let g = null, gi = -1;
+  L.notes.forEach((n,i) => {
+    if(n.grp !== gi){ g = document.createElement('div'); g.className = 'grp'; box.appendChild(g); gi = n.grp; }
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tile'; b.dataset.i = i;
+    b.setAttribute('aria-label', SW[n.k].n + (n.oct>0?' upper octave':n.oct<0?' lower octave':'') + '. Tap to hear.');
+    b.innerHTML = tileHTML(n); g.appendChild(b);
+  });
+  const ks = [...new Set(L.notes.map(n => n.k))].sort((a,b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+  $('#tapKeys').innerHTML = '';
+  ks.forEach(k => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tile'; b.dataset.k = k;
+    b.innerHTML = tileHTML({k, oct:0}); $('#tapKeys').appendChild(b);
+  });
+  const z = $('#zone'); z.style.left = (50 - L.tol/60*50) + '%'; z.style.width = (L.tol/60*100) + '%';
+  $('#pTime').textContent = '0:00';
+  updateTiles(); updateControls(); paintReadout();
+}
+function updateTiles(){
+  const run = state.run;
+  if(isFree()){ $$('#tiles .tile').forEach(t => t.classList.remove('done','miss','cur')); return; }
+  if(state.mode === 'riyaz'){
+    const res = run.rz.slotRes || [];
+    $$('#tiles .tile').forEach((t,i) => {
+      const r = res[i];
+      t.classList.toggle('done', !!r && r.hit);
+      t.classList.toggle('miss', !!r && !r.hit);
+      t.classList.toggle('cur', i === run.i && run.rz.phase === 'sing');
+    });
+    return;
+  }
+  $$('#tiles .tile').forEach((t,i) => {
+    t.classList.remove('miss');
+    t.classList.toggle('done', i < run.i);
+    t.classList.toggle('cur', i === run.i && run.status !== 'done');
+  });
+  $('#pBar').style.width = (run.i / state.lesson.notes.length * 100) + '%';
+}
+function updateControls(){
+  const run = state.run, sb = $('#startBtn'), lb = $('#listenBtn'), m = state.mode;
+  const idle = m === 'riyaz' ? 'Start riyaz' : isFree() ? 'Play loop' : m === 'practice' ? 'Start practice' : 'Start singing';
+  sb.textContent = run.status === 'running' ? 'Pause' : run.status === 'paused' ? 'Resume'
+    : run.status === 'calibrating' ? 'Calibrating…' : idle;
+  sb.disabled = ['listening','done','calibrating'].includes(run.status);
+  lb.hidden = m !== 'practice' || state.free;
+  lb.textContent = run.status === 'listening' ? 'Stop' : 'Listen';
+  lb.disabled = run.status === 'done' || run.status === 'calibrating';
+  $('#graphHint').hidden = isFree() || run.status !== 'idle' || !!state.mic;
+}
+function setMsg(t, warn){ const m = $('#pMsg'); m.textContent = t; m.classList.toggle('warn', !!warn); }
+
+const el = {};
+function paintReadout(){
+  const run = state.run, L = state.lesson;
+  if(!run) return;
+  el.tName ||= $('#tName'); el.tDev ||= $('#tDev'); el.tHz ||= $('#tHz');
+  el.you ||= $('#youName'); el.verdict ||= $('#verdict'); el.needle ||= $('#needle');
+  const note = L.notes[Math.min(run.i, L.notes.length-1)], s = SW[note.k];
+  el.tName.textContent = s.n + (note.oct>0 ? ' (upper)' : note.oct<0 ? ' (lower)' : '');
+  el.tDev.textContent = s.d;
+  el.tHz.textContent = noteHz(note).toFixed(1) + ' Hz';
+  const c = run.cur;
+  if(c == null){
+    el.you.textContent = '—';
+    el.verdict.textContent = state.mic ? 'Listening…' : 'Mic is off';
+    el.needle.style.opacity = .25; el.needle.classList.remove('ok');
+  } else {
+    const e = errTo(c, note.c), near = nearest(c), ok = Math.abs(e) <= L.tol;
+    el.you.textContent = near.n;
+    el.verdict.textContent = ok ? 'On pitch · ' + (e>=0?'+':'−') + Math.abs(Math.round(e)) + '¢'
+      : (e < 0 ? 'Low · sing a little higher' : 'High · ease down');
+    el.needle.style.left = (50 + clamp(e,-60,60)/60*50) + '%';
+    el.needle.style.opacity = 1; el.needle.classList.toggle('ok', ok);
+  }
+}
+
+/* ---------- pitch graph ---------- */
+const gcv = $('#graph'), gctx = gcv.getContext('2d');
+let gW = 0, gH = 0, dpr = 1, colCache = null, colT = -1e9, fontFam = 'sans-serif';
+function sizeGraph(){
+  const r = gcv.getBoundingClientRect();
+  dpr = Math.min(2, window.devicePixelRatio || 1); gW = r.width; gH = r.height;
+  gcv.width = Math.round(gW*dpr); gcv.height = Math.round(gH*dpr);
+}
+if(window.ResizeObserver) new ResizeObserver(sizeGraph).observe(gcv);
+window.addEventListener('resize', sizeGraph);
+function colors(now){
+  if(!colCache || now - colT > 400){
+    const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+    colCache = {muted:g('--muted'), line:g('--line'), accent:g('--accent'), you:g('--you'), soft:g('--accent-soft'), youSoft:g('--you-soft'), fg:g('--fg'), accfg:g('--accent-fg')};
+    fontFam = getComputedStyle(document.body).fontFamily; colT = now;
+  }
+  return colCache;
+}
+function rr(ctx, x, y, w, h, r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+}
+/* Freehand: notes scroll right to left toward the "now" line, like a MIDI piano roll. */
+function drawRollNotes(C, padL, padR, padT, padB, plotW, plotH, Y){
+  const run = state.run, L = state.lesson, ctx = gctx;
+  const bl = 60/state.tempo, idle = !fh.loops.length;
+  let loops = fh.loops, now = ac ? ac.currentTime : 0;
+  if(idle){ loops = [Object.assign({t0:bl, n:0}, freeLoopInfo(L, bl))]; now = 0; }
+  const win = bl*7, nowX = padL + plotW*.25, pps = plotW/win;
+  const X = t => nowX + (t - now)*pps;
+  const barH = clamp(plotH*110/(run.hi - run.lo), 10, 28);
+  ctx.save(); ctx.beginPath(); ctx.rect(padL, 0, gW - padL, gH); ctx.clip();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for(const lp of loops){
+    L.notes.forEach((n,i) => {
+      const t0 = lp.t0 + lp.starts[i], x0 = X(t0), x1 = X(t0 + lp.bl*.94);
+      if(x1 < padL || x0 > gW) return;
+      const y = Y(n.c) - barH/2, on = x0 <= nowX && nowX <= x1, past = x1 < nowX;
+      rr(ctx, x0, y, x1 - x0, barH, 6);
+      ctx.fillStyle = on ? C.accent : past ? C.line : C.soft; ctx.fill();
+      if(!past && !on){ ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5; ctx.stroke(); }
+      if(x1 - x0 > 26){
+        ctx.fillStyle = on ? C.accfg : past ? C.muted : C.fg;
+        ctx.font = Math.min(16, barH - 4) + 'px "Tiro Devanagari Hindi","Noto Serif Devanagari","Noto Sans Devanagari",serif';
+        ctx.fillText(SW[n.k].d, (x0 + x1)/2, y + barH/2 + 1);
+      }
+    });
+  }
+  ctx.restore();
+  ctx.strokeStyle = C.you; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(nowX, padT); ctx.lineTo(nowX, gH - padB); ctx.stroke();
+  ctx.fillStyle = C.you; ctx.beginPath(); ctx.moveTo(nowX-6, padT); ctx.lineTo(nowX+6, padT); ctx.lineTo(nowX, padT+8); ctx.closePath(); ctx.fill();
+  ctx.textAlign = 'start';
+}
+function drawGraph(now){
+  const run = state.run, L = state.lesson;
+  if(!run || !L || gW < 10) return;
+  const C = colors(now), ctx = gctx;
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,gW,gH);
+  const padL = 48, padR = 12, padT = 12, padB = 12, plotW = gW-padL-padR, plotH = gH-padT-padB;
+  const Y = c => padT + plotH - (c - run.lo)/(run.hi - run.lo)*plotH;
+  ctx.font = '11px ' + fontFam; ctx.textBaseline = 'middle';
+  run.ladder.forEach(l => {
+    const y = Y(l.c);
+    ctx.globalAlpha = l.sa ? .6 : 1; ctx.strokeStyle = l.sa ? C.accent : C.line; ctx.lineWidth = l.sa ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(gW-padR, y); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = C.muted; ctx.fillText(l.label, 8, y);
+  });
+  if(isFree()){ drawRollNotes(C, padL, padR, padT, padB, plotW, plotH, Y); return; }
+  const note = L.notes[Math.min(run.i, L.notes.length-1)];
+  ctx.fillStyle = C.soft;
+  ctx.fillRect(padL, Y(note.c + L.tol), plotW, Y(note.c - L.tol) - Y(note.c + L.tol));
+  const px = padL + plotW*.88;
+  if(run.status === 'running' && run.hold > 0){
+    ctx.fillStyle = C.youSoft;
+    ctx.fillRect(px, Y(note.c + L.tol), (gW-padR-px)*clamp(run.hold/L.hold,0,1), Y(note.c - L.tol) - Y(note.c + L.tol));
+  }
+  ctx.setLineDash([4,4]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, gH-padB); ctx.stroke(); ctx.setLineDash([]);
+  const win = 8000, X = t => px - (now - t)/win*(px - padL);
+  let prev = null, last = null;
+  ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for(const p of run.trace){
+    if(p.y == null){ prev = null; continue; }
+    const x = X(p.t), y = Y(clamp(p.y, run.lo, run.hi));
+    if(prev){ ctx.strokeStyle = p.ok ? C.you : C.muted; ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(x, y); ctx.stroke(); }
+    prev = {x, y}; last = {x, y, ok:p.ok};
+  }
+  if(last && now - run.trace[run.trace.length-1].t < 200){
+    ctx.fillStyle = last.ok ? C.you : C.accent;
+    ctx.beginPath(); ctx.arc(last.x, last.y, 5.5, 0, 6.283); ctx.fill();
+  }
+}
+
+/* ---------- main loop ---------- */
+let raf = 0, lastDet = 0, lastTs = 0;
+function frame(ts){
+  raf = requestAnimationFrame(frame);
+  const run = state.run; if(!run) return;
+  const fdt = Math.min(.1, (ts - lastTs)/1000); lastTs = ts;
+  if(run.status === 'running'){
+    run.elapsed += fdt; $('#pTime').textContent = fmtT(run.elapsed);
+    if(isFree()) freeTick(run);
+    else if(state.mode === 'practice') practiceTick(run, fdt);
+    else if(state.mode === 'riyaz') riyazTick(run);
+  }
+  if(state.mic && run.status !== 'listening' && ts - lastDet >= 30){
+    const dt = Math.min(.1, (ts - lastDet)/1000); lastDet = ts;
+    if(run.status === 'calibrating'){ calStep(run, dt); paintReadout(); drawGraph(ts); return; }
+    /* the app's own tones are not scored: skip the mic while it is playing */
+    const mute = run.status === 'running' &&
+      ((state.mode === 'practice' && run.phase !== 'sing') || (state.mode === 'riyaz' && run.rz.phase !== 'sing'));
+    const c = mute ? null : detect();
+    run.cur = c;
+    const note = state.lesson.notes[Math.min(run.i, state.lesson.notes.length-1)];
+    if(c == null) run.trace.push({t:ts, y:null, ok:false});
+    else {
+      const e = errTo(c, note.c);
+      run.trace.push({t:ts, y: state.any ? note.c + e : c, ok: Math.abs(e) <= state.lesson.tol});
+    }
+    while(run.trace.length && ts - run.trace[0].t > 8500) run.trace.shift();
+    if(run.status === 'running') scoreDispatch(c, dt);
+  } else if(run.status === 'listening'){ run.cur = null; }
+  paintReadout(); drawGraph(ts);
+}
+
+/* =====================================================================
+   Navigation + events
+   ===================================================================== */
+function show(v){
+  $('#home').hidden = v !== 'home'; $('#practice').hidden = v !== 'practice';
+  $('#result').hidden = true;
+  if(v === 'practice'){
+    if(!raf){ lastTs = performance.now(); raf = requestAnimationFrame(frame); }
+    sizeGraph(); window.scrollTo(0,0);
+  } else {
+    cancelAnimationFrame(raf); raf = 0; stopListen();
+    if(state.run && state.run.status === 'running') pauseRun();
+    renderHome(); window.scrollTo(0,0);
+  }
+}
+function startLesson(id){
+  state.lesson = LESSONS[id]; resetRun(); applyMode();
+  renderPractice(); show('practice'); setMsg(modeMsg());
+}
+
+function buildStatic(){
+  $('#saChips').innerHTML = PCN.map((p,i) => '<button type="button" class="chip" data-pc="'+i+'" aria-pressed="false">'+p+'</button>').join('');
+  const sel = $('#saSel'); sel.innerHTML = '';
+  for(let m=36; m<=71; m++){
+    const o = document.createElement('option'); o.value = m;
+    o.textContent = saLabel(m) + ' · ' + midiHz(m).toFixed(0) + ' Hz'; sel.appendChild(o);
+  }
+}
+function setSa(m){
+  const changed = clamp(m, 36, 71) !== state.saMidi;
+  state.saMidi = clamp(m, 36, 71); hist.length = 0;
+  if(changed && state.tanpura && state.out === 'speaker'){
+    state.needCal = true; state.spk = null;
+    const r = state.run;
+    if(r && r.status === 'running'){ pauseRun(); setMsg('Sa changed. Press Resume so Riyaz can learn the new drone.'); }
+  }
+  if(state.run) state.run.trace = [];
+  persist(); renderSa();
+  if(state.lesson && !$('#practice').hidden) paintReadout();
+}
+
+function wire(){
+  $('#saChips').addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if(!b) return;
+    const oct = Math.floor(state.saMidi/12); setSa(oct*12 + Number(b.dataset.pc));
+  });
+  $('#octDn').addEventListener('click', () => setSa(state.saMidi - 12));
+  $('#octUp').addEventListener('click', () => setSa(state.saMidi + 12));
+  $('#saSel').addEventListener('change', e => setSa(Number(e.target.value)));
+  $$('.js-tan').forEach(b => b.addEventListener('click', toggleTanpura));
+  $('#anySeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    state.any = b.dataset.v === '1'; persist(); renderAny();
+    if(state.run) state.run.trace = [];
+  });
+  $('#cycle').addEventListener('input', e => { state.cycle = Number(e.target.value); $('#cycleOut').textContent = state.cycle.toFixed(1) + ' s'; persist(); });
+  $('#vol').addEventListener('input', e => {
+    state.vol = Number(e.target.value); persist();
+    if(ac && state.tanpura) tanBus.gain.setTargetAtTime(state.vol, ac.currentTime, .05);
+  });
+  $('#micBtn').addEventListener('click', enableMic);
+  $('#outSeg').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if(!b || b.dataset.v === state.out) return;
+    state.out = b.dataset.v; state.gate = .012; state.needCal = true; state.spk = null; persist(); renderOut();
+  });
+  $$('.js-mode').forEach(c => c.addEventListener('click', e => { const b = e.target.closest('button'); if(b) setMode(b.dataset.v); }));
+  $$('.js-free').forEach(c => c.addEventListener('click', e => { const b = e.target.closest('button'); if(b) setFree(b.dataset.v === '1'); }));
+  $('#soundSeg').addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return; state.freeSound = b.dataset.v === '1'; persist(); renderSliders(); });
+  $('#tempo').addEventListener('input', e => { state.tempo = Number(e.target.value); $('#tempoOut').textContent = state.tempo + ' bpm'; persist(); });
+  $('#roundsSeg').addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return; state.rounds = Number(b.dataset.v); persist(); renderSliders(); });
+  $('#unlockAll').addEventListener('change', e => { state.unlockAll = e.target.checked; persist(); renderHome(); });
+  let armed = 0;
+  $('#resetBtn').addEventListener('click', e => {
+    if(!armed){ e.target.textContent = 'Tap again to erase'; armed = setTimeout(() => { armed = 0; e.target.textContent = 'Erase progress'; }, 3000); return; }
+    clearTimeout(armed); armed = 0; e.target.textContent = 'Erase progress';
+    state.stars = {}; state.streak = 0; state.last = ''; persist(); renderHome();
+  });
+  $('#stages').addEventListener('click', e => {
+    const b = e.target.closest('.lesson'); if(!b || b.disabled) return;
+    startLesson(Number(b.dataset.id));
+  });
+
+  $('#backBtn').addEventListener('click', () => show('home'));
+  $('#startBtn').addEventListener('click', startOrPause);
+  $('#listenBtn').addEventListener('click', listen);
+  $('#restartBtn').addEventListener('click', () => { stopListen(); resetRun(); renderPractice(); setMsg(modeMsg()); });
+  $('#tiles').addEventListener('click', e => {
+    const t = e.target.closest('.tile'); if(!t || state.mode === 'test' || state.run.status === 'listening') return;
+    const n = state.lesson.notes[Number(t.dataset.i)];
+    playTone(noteHz(n), audio().currentTime + .01, .9);
+  });
+  $('#tapKeys').addEventListener('click', e => { const t = e.target.closest('.tile'); if(t) onTap(t.dataset.k); });
+
+  $('#rNext').addEventListener('click', () => {
+    if($('#rNext').dataset.act === 'test'){
+      $('#result').hidden = true; stopListen(); state.mode = 'test'; persist();
+      resetRun(); renderPractice(); applyMode(); setMsg(modeMsg());
+    } else { state.mode = 'practice'; persist(); startLesson(state.lesson.id + 1); }
+  });
+  $('#rRetry').addEventListener('click', () => { $('#result').hidden = true; stopListen(); resetRun(); renderPractice(); setMsg(modeMsg()); });
+  $('#rBack').addEventListener('click', () => show('home'));
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#result').hidden) show('home'); });
+}
+
+buildStatic(); wire();
+$('#unlockAll').checked = state.unlockAll;
+renderSa(); renderAny(); renderOut(); renderSliders(); renderMic(); renderTanpura(); applyMode(); renderHome();
+})();
+</script>
+</body>
+</html>
