@@ -1875,11 +1875,19 @@ function frame(ts){
    Navigation + events
    ===================================================================== */
 function show(v){
-  $('#home').hidden = v !== 'home'; $('#practice').hidden = v !== 'practice';
-  $('#result').hidden = true;
+  $('#home').hidden       = v !== 'home';
+  $('#practice').hidden   = v !== 'practice';
+  $('#dp-setup').hidden   = v !== 'dp-setup';
+  $('#dp-session').hidden = v !== 'dp-session';
+  $('#result').hidden     = true;
+  $('#dp-result').hidden  = true;
   if(v === 'practice'){
     if(!raf){ lastTs = performance.now(); raf = requestAnimationFrame(frame); }
     sizeGraph(); window.scrollTo(0,0);
+  } else if(v === 'dp-setup'){
+    dpRenderSetup(); window.scrollTo(0,0);
+  } else if(v === 'dp-session'){
+    window.scrollTo(0,0);
   } else {
     cancelAnimationFrame(raf); raf = 0; stopListen();
     if(state.run && state.run.status === 'running') pauseRun();
@@ -1898,6 +1906,16 @@ function buildStatic(){
     const o = document.createElement('option'); o.value = m;
     o.textContent = saLabel(m) + ' · ' + midiHz(m).toFixed(0) + ' Hz'; sel.appendChild(o);
   }
+  const dpModes = [
+    {k:'sargam',   label:'Basic Sargam'},
+    {k:'bhoopali', label:'Bhoopali'},
+    {k:'yaman',    label:'Yaman'},
+    {k:'bhairav',  label:'Bhairav'},
+    {k:'kafi',     label:'Kafi'}
+  ];
+  $('#dpModeChips').innerHTML = dpModes.map(m =>
+    '<button type="button" class="chip" data-m="'+m.k+'" aria-pressed="false">'+m.label+'</button>'
+  ).join('');
 }
 function setSa(m){
   const changed = clamp(m, 36, 71) !== state.saMidi;
@@ -1973,6 +1991,55 @@ function wire(){
   $('#rRetry').addEventListener('click', () => { $('#result').hidden = true; stopListen(); resetRun(); renderPractice(); setMsg(modeMsg()); });
   $('#rBack').addEventListener('click', () => show('home'));
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#result').hidden) show('home'); });
+
+  /* ---- daily practice ---- */
+  $('#dpEntryBtn').addEventListener('click', () => show('dp-setup'));
+
+  $('#dpBackBtn').addEventListener('click', () => {
+    if(state.tanpura) stopTanpura();
+    show('home');
+  });
+
+  $('#dpModeChips').addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if(!b) return;
+    dpState.mode = b.dataset.m; dpRenderSetup();
+  });
+
+  $('#dpDurSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    dpState.dur = Number(b.dataset.v); dpRenderSetup();
+  });
+
+  $('#dpTempo').addEventListener('input', e => {
+    state.tempo = Number(e.target.value);
+    $('#dpTempoOut').textContent = state.tempo + ' bpm';
+    persist();
+  });
+
+  $('#dpStartBtn').addEventListener('click', () => {
+    dpStartSession(dpState.mode, dpState.dur);
+  });
+
+  $('#dpEndBtn').addEventListener('click', dpEndSession);
+
+  $('#dpPauseBtn').addEventListener('click', dpPauseToggle);
+
+  $('#dpTablaVol').value = dp.tablaVol;
+  $('#dpTablaVol').addEventListener('input', e => {
+    dp.tablaVol = Number(e.target.value);
+    if(dp.tablaGain && ac) dp.tablaGain.gain.setTargetAtTime(dp.tablaVol, ac.currentTime, 0.05);
+  });
+
+  $('#dprAgain').addEventListener('click', () => {
+    $('#dp-result').hidden = true;
+    dpStartSession(dp.mode, dp.totalSec);
+  });
+
+  $('#dprHome').addEventListener('click', () => {
+    $('#dp-result').hidden = true;
+    if(state.tanpura) stopTanpura();
+    show('home');
+  });
 }
 
 /* =====================================================================
@@ -2184,6 +2251,55 @@ function dpEndSession(){
   stopTabla();
   if(state.tanpura) stopTanpura();
   show('home');
+}
+
+/* =====================================================================
+   Daily Practice — renderers
+   ===================================================================== */
+const dpState = { mode: 'sargam', dur: 900 };
+
+function dpRenderSetup(){
+  $$('#dpModeChips .chip').forEach(c =>
+    c.setAttribute('aria-pressed', String(c.dataset.m === dpState.mode)));
+  $$('#dpDurSeg button').forEach(b =>
+    b.setAttribute('aria-pressed', String(Number(b.dataset.v) === dpState.dur)));
+  $('#dpTempo').value = state.tempo;
+  $('#dpTempoOut').textContent = state.tempo + ' bpm';
+}
+
+function dpRenderSession(){
+  const phase = dp.phases[dp.phaseIdx];
+  if(!phase) return;
+  const ex = phase.exercises[dp.exIdx];
+  if(!ex) return;
+  $('#dpPhaseName').textContent =
+    'Phase ' + (dp.phaseIdx + 1) + ' of ' + dp.phases.length + ' \u00b7 ' + phase.name;
+  $('#dpExName').textContent = ex.name;
+
+  const box = $('#dpTiles'); box.innerHTML = '';
+  const notes = ex.random
+    ? (dp.randomPool.length ? dp.randomPool.slice(0, 8) : dpGenRandomPool(dp.mode).slice(0, 8))
+    : (ex.notes || []);
+  let g = null, gi = -1;
+  notes.forEach((n, i) => {
+    if(n.grp !== gi){ g = document.createElement('div'); g.className = 'grp'; box.appendChild(g); gi = n.grp; }
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tile'; b.dataset.i = i;
+    b.setAttribute('aria-label', SW[n.k].n);
+    const s = SW[n.k], oct = n.oct > 0 ? 'taar' : n.oct < 0 ? 'mandra' : '';
+    b.innerHTML = '<span class="g ' + oct + ' ' + (s.kind||'') + '">' + s.d +
+      '<i class="oc"></i><i class="vr"></i></span><span class="r">' + s.n + '</span>';
+    g.appendChild(b);
+  });
+}
+
+function dpRenderSummary(){
+  const rd = RAAG_DATA[dp.mode];
+  $('#dprSub').textContent = rd.name + ' \u00b7 ' + fmtT(dp.elapsed) + ' practiced';
+  $('#dprTime').textContent = fmtT(dp.elapsed);
+  $('#dprMode').textContent = rd.name;
+  $('#dprPhases').textContent = Math.min(dp.phaseIdx + 1, dp.phases.length) + ' / ' + dp.phases.length;
+  $('#dp-result').hidden = false;
+  $('#dprAgain').focus();
 }
 
 buildStatic(); wire();
