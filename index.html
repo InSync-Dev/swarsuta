@@ -1975,6 +1975,217 @@ function wire(){
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#result').hidden) show('home'); });
 }
 
+/* =====================================================================
+   Daily Practice — session state + engine
+   ===================================================================== */
+const dp = {
+  mode: null,
+  totalSec: 0,
+  elapsed: 0,
+  phases: [],
+  phaseIdx: 0,
+  phaseElapsed: 0,
+  exIdx: 0,
+  exElapsed: 0,
+  status: 'idle',
+  tablaBuffer: null,
+  tablaSrc: null,
+  tablaGain: null,
+  tablaVol: 0.6,
+  schedNext: 0,
+  schedIdx: 0,
+  curNoteIdx: 0,
+  raf: 0,
+  lastTs: 0,
+  randomPool: [],
+  randomPoolIdx: 0,
+  randomNextAt: 0
+};
+
+function dpGenRandomPool(mode){
+  const pools = {
+    sargam:   ['S','R','G','M','P','D','N'],
+    bhoopali: ['S','R','G','P','D'],
+    yaman:    ['N','R','G','m','P','D'],
+    bhairav:  ['S','r','G','M','P','d','N'],
+    kafi:     ['S','R','g','M','P','D','n']
+  };
+  const base = pools[mode] || pools.sargam;
+  const out = [];
+  for(let i = 0; i < 120; i++){
+    const k = base[Math.floor(Math.random() * base.length)];
+    out.push({k, oct:0, c:SW[k].c, grp:0});
+  }
+  return out;
+}
+
+function dpLoadExercise(){
+  const phase = dp.phases[dp.phaseIdx];
+  if(!phase) return;
+  const ex = phase.exercises[dp.exIdx];
+  if(!ex) return;
+  dp.exElapsed = 0;
+  dp.schedIdx = 0;
+  dp.curNoteIdx = 0;
+  if(ex.random){
+    dp.randomPool = dpGenRandomPool(dp.mode);
+    dp.randomPoolIdx = 0;
+    dp.randomNextAt = ac ? ac.currentTime + 0.3 : 0;
+  } else {
+    dp.schedNext = ac ? ac.currentTime + 0.3 : 0;
+  }
+}
+
+function dpScheduleNotes(){
+  if(!ac || dp.status !== 'running') return;
+  const phase = dp.phases[dp.phaseIdx];
+  if(!phase) return;
+  const ex = phase.exercises[dp.exIdx];
+  if(!ex) return;
+
+  if(ex.random){
+    while(dp.randomNextAt < ac.currentTime + 0.8){
+      const pool = dp.randomPool;
+      const n = pool[dp.randomPoolIdx % pool.length];
+      playTone(noteHz(n), dp.randomNextAt, 2.5, 0.5);
+      dp.curNoteIdx = dp.randomPoolIdx % pool.length;
+      dp.randomPoolIdx++;
+      dp.randomNextAt += 3;
+    }
+    return;
+  }
+
+  const notes = ex.notes;
+  if(!notes || notes.length === 0) return;
+  const bl = 60 / state.tempo;
+
+  while(dp.schedNext < ac.currentTime + 0.8){
+    const n = notes[dp.schedIdx % notes.length];
+    playTone(noteHz(n), dp.schedNext, bl * 0.92, 0.5);
+    dp.curNoteIdx = dp.schedIdx % notes.length;
+    const nextIdx = (dp.schedIdx + 1) % notes.length;
+    const nextN   = notes[nextIdx];
+    const isLoopEnd    = nextIdx === 0;
+    const isGroupCross = !isLoopEnd && nextN.grp !== n.grp;
+    const gap = (isLoopEnd || isGroupCross) ? bl * 0.5 : 0;
+    dp.schedNext += bl + gap;
+    dp.schedIdx++;
+  }
+}
+
+function dpAdvanceExercise(){
+  const phase = dp.phases[dp.phaseIdx];
+  dp.exIdx++;
+  if(dp.exIdx >= phase.exercises.length){
+    dpAdvancePhase();
+  } else {
+    dpLoadExercise();
+    dpRenderSession();
+  }
+}
+
+function dpAdvancePhase(){
+  dp.phaseIdx++;
+  dp.phaseElapsed = 0;
+  dp.exIdx = 0;
+  if(dp.phaseIdx >= dp.phases.length){
+    dpFinish();
+  } else {
+    dpLoadExercise();
+    dpRenderSession();
+  }
+}
+
+function dpFinish(){
+  dp.status = 'done';
+  cancelAnimationFrame(dp.raf); dp.raf = 0;
+  stopTabla();
+  dpRenderSummary();
+}
+
+function dpFrame(ts){
+  dp.raf = requestAnimationFrame(dpFrame);
+  if(dp.status !== 'running') return;
+
+  const fdt = Math.min(0.1, (ts - dp.lastTs) / 1000);
+  dp.lastTs = ts;
+  dp.elapsed     += fdt;
+  dp.phaseElapsed += fdt;
+  dp.exElapsed   += fdt;
+
+  dpScheduleNotes();
+
+  const phase = dp.phases[dp.phaseIdx];
+  if(phase && dp.exElapsed >= phase.sliceSec) dpAdvanceExercise();
+
+  if(dp.elapsed >= dp.totalSec){ dpFinish(); return; }
+
+  const timeEl = $('#dpTime');
+  if(timeEl) timeEl.textContent = fmtT(dp.elapsed) + ' / ' + fmtT(dp.totalSec);
+
+  const bar = $('#dpBar');
+  if(bar) bar.style.width = (dp.elapsed / dp.totalSec * 100) + '%';
+
+  const ex = phase && phase.exercises[dp.exIdx];
+  const tileCount = ex && ex.random ? Math.min(dp.randomPool.length, 7) : (ex && ex.notes ? ex.notes.length : 0);
+  $$('#dpTiles .tile').forEach((t, i) => t.classList.toggle('hear', i === dp.curNoteIdx));
+}
+
+async function dpStartSession(mode, totalSec){
+  dp.mode       = mode;
+  dp.totalSec   = totalSec;
+  dp.elapsed    = 0;
+  dp.phaseIdx   = 0;
+  dp.phaseElapsed = 0;
+  dp.exIdx      = 0;
+  dp.exElapsed  = 0;
+  dp.schedIdx   = 0;
+  dp.curNoteIdx = 0;
+  dp.status     = 'running';
+  dp.phases     = buildDailyPhases(mode, totalSec);
+
+  audio();
+  dp.tablaGain = ac.createGain();
+  dp.tablaGain.gain.value = dp.tablaVol;
+  if(!dp.tablaBuffer){
+    const msgEl = $('#dpMsg'); if(msgEl) msgEl.textContent = 'Loading tabla\u2026';
+    dp.tablaBuffer = await loadTabla();
+    if(msgEl) msgEl.textContent = dp.tablaBuffer ? '' : 'Tabla not available \u2014 tanpura only.';
+  }
+  if(dp.tablaBuffer) startTabla(dp.tablaBuffer, dp.tablaGain);
+
+  dpLoadExercise();
+  dpRenderSession();
+  show('dp-session');
+  dp.lastTs = performance.now();
+  dp.raf = requestAnimationFrame(dpFrame);
+}
+
+function dpPauseToggle(){
+  if(dp.status === 'running'){
+    dp.status = 'paused';
+    stopTabla();
+    cancelAnimationFrame(dp.raf); dp.raf = 0;
+    const pb = $('#dpPauseBtn'); if(pb) pb.textContent = 'Resume';
+  } else if(dp.status === 'paused'){
+    dp.status = 'running';
+    if(dp.tablaBuffer) startTabla(dp.tablaBuffer, dp.tablaGain);
+    dp.schedNext    = ac ? ac.currentTime + 0.3 : 0;
+    dp.randomNextAt = ac ? ac.currentTime + 0.3 : 0;
+    dp.lastTs = performance.now();
+    dp.raf = requestAnimationFrame(dpFrame);
+    const pb = $('#dpPauseBtn'); if(pb) pb.textContent = 'Pause';
+  }
+}
+
+function dpEndSession(){
+  dp.status = 'done';
+  cancelAnimationFrame(dp.raf); dp.raf = 0;
+  stopTabla();
+  if(state.tanpura) stopTanpura();
+  show('home');
+}
+
 buildStatic(); wire();
 $('#unlockAll').checked = state.unlockAll;
 renderSa(); renderAny(); renderOut(); renderSliders(); renderMic(); renderTanpura(); applyMode(); renderHome();
