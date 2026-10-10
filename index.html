@@ -695,6 +695,19 @@ const RAAG_DATA = {
       { name: 'Phrase 1', seq: 'S R g M P' },
       { name: 'Phrase 2', seq: 'M g R S' }
     ]
+  },
+  eriaali: {
+    name: 'Eri Aali', dev: 'एरी आली',
+    warmup: 'S r g M P d n S\' | S\' n d P M g r S',
+    alankars: [
+      { name: 'Alankar 1', seq: 'S r g | r g M | g M P | M P d | P d n | d n S\'' },
+      { name: 'Alankar 2', seq: 'S r S | r g r | g M g | M P M | P d P | d n d | n S\' n' },
+      { name: 'Alankar 3 — Thirds', seq: 'S g | r M | g P | M d | P n | d S\'' }
+    ],
+    phrases: [
+      { name: 'Sthayi', seq: 'n, d, S r | g M r S' },
+      { name: 'Antara', seq: 'M P d n | S\' r\' S\' n | d P M g r S' }
+    ]
   }
 };
 
@@ -1957,7 +1970,8 @@ function buildStatic(){
     {k:'bhoopali', label:'Bhoopali'},
     {k:'yaman',    label:'Yaman'},
     {k:'bhairav',  label:'Bhairav'},
-    {k:'kafi',     label:'Kafi'}
+    {k:'kafi',     label:'Kafi'},
+    {k:'eriaali',  label:'Eri Aali'}
   ];
   $('#dpModeChips').innerHTML = dpModes.map(m =>
     '<button type="button" class="chip" data-m="'+m.k+'" aria-pressed="false">'+m.label+'</button>'
@@ -2137,7 +2151,8 @@ function dpGenRandomPool(mode){
     bhoopali: ['S','R','G','P','D'],
     yaman:    ['N','R','G','m','P','D'],
     bhairav:  ['S','r','G','M','P','d','N'],
-    kafi:     ['S','R','g','M','P','D','n']
+    kafi:     ['S','R','g','M','P','D','n'],
+    eriaali:  ['S','r','g','M','P','d','n']
   };
   const base = pools[mode] || pools.sargam;
   const out = [];
