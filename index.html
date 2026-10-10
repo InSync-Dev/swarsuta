@@ -411,6 +411,10 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
         <span class="strings" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
         <span class="tl">Start tanpura</span>
       </button>
+      <div class="dp-vol" style="min-width:160px">
+        <span>Vol</span>
+        <input id="practiceTanVol" type="range" min="0" max="1" step="0.05">
+      </div>
       <span class="sp"></span>
       <label for="saSel" class="eyebrow">Sa</label>
       <select id="saSel" aria-label="Pitch of Sa"></select>
@@ -474,9 +478,9 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
         <span class="strings" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
         <span class="tl">Tanpura</span>
       </button>
-      <div class="dp-vol">
-        <span>Tabla</span>
-        <input id="dpTablaVol" type="range" min="0" max="1" step="0.05">
+      <div class="dp-vol" style="min-width:160px">
+        <span>Vol</span>
+        <input id="dpTanVol" type="range" min="0" max="1" step="0.05">
       </div>
     </div>
     <div class="dp-controls">
@@ -788,12 +792,14 @@ function dpSchedTabla(){
 }
 
 function startTabla(){
+  /* tabla disabled — re-enable when a real sample is available
   if(!ac) return;
   dpTablaTimer.next = ac.currentTime + 0.15;
   dpTablaTimer.beat = 0;
   clearInterval(dpTablaTimer.timer);
   dpTablaTimer.timer = setInterval(dpSchedTabla, 80);
   dpSchedTabla();
+  */
 }
 
 function stopTabla(){
@@ -1926,6 +1932,7 @@ function show(v){
   } else if(v === 'dp-setup'){
     dpRenderSetup(); window.scrollTo(0,0);
   } else if(v === 'dp-session'){
+    $('#dpTanVol').value = state.vol;
     window.scrollTo(0,0);
   } else {
     cancelAnimationFrame(raf); raf = 0; stopListen();
@@ -1987,6 +1994,17 @@ function wire(){
   $('#vol').addEventListener('input', e => {
     state.vol = Number(e.target.value); persist();
     if(ac && state.tanpura) tanBus.gain.setTargetAtTime(state.vol, ac.currentTime, .05);
+    /* sync practice + dp session sliders */
+    $('#practiceTanVol').value = state.vol;
+    $('#dpTanVol').value = state.vol;
+  });
+  /* practice session tanpura vol */
+  $('#practiceTanVol').value = state.vol;
+  $('#practiceTanVol').addEventListener('input', e => {
+    state.vol = Number(e.target.value); persist();
+    if(ac && state.tanpura) tanBus.gain.setTargetAtTime(state.vol, ac.currentTime, .05);
+    $('#vol').value = state.vol;
+    $('#dpTanVol').value = state.vol;
   });
   $('#micBtn').addEventListener('click', enableMic);
   $('#outSeg').addEventListener('click', async e => {
@@ -2067,10 +2085,13 @@ function wire(){
     if(dp.status === 'running' || dp.status === 'paused') dpAdvanceExercise();
   });
 
-  $('#dpTablaVol').value = dp.tablaVol;
-  $('#dpTablaVol').addEventListener('input', e => {
-    dp.tablaVol = Number(e.target.value);
-    if(dp.tablaGain && ac) dp.tablaGain.gain.setTargetAtTime(dp.tablaVol, ac.currentTime, 0.05);
+  /* dp session tanpura vol — syncs with global state.vol */
+  $('#dpTanVol').value = state.vol;
+  $('#dpTanVol').addEventListener('input', e => {
+    state.vol = Number(e.target.value); persist();
+    if(ac && state.tanpura) tanBus.gain.setTargetAtTime(state.vol, ac.currentTime, .05);
+    $('#vol').value = state.vol;
+    $('#practiceTanVol').value = state.vol;
   });
 
   $('#dprAgain').addEventListener('click', () => {
