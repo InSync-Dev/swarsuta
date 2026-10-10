@@ -221,6 +221,29 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
   .strings i.p,.tile.bad,.tile.pop{animation:none}
   .tuner .needle{transition:none}
 }
+
+/* ---------- daily practice ---------- */
+.dp-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-top:20px;padding:16px 18px;border:1px solid var(--accent);border-radius:16px;
+  background:var(--accent-soft);cursor:pointer;text-align:left;width:100%}
+.dp-entry h3{font-size:18px;font-weight:700;margin:0;line-height:1.2}
+.dp-entry p{font-size:13px;color:var(--muted);margin:4px 0 0}
+.dp-entry .arr{font-size:26px;line-height:1;flex-shrink:0}
+.dp-setup-body{margin-top:24px;display:grid;gap:20px}
+.dp-session-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding-top:16px;flex-wrap:wrap}
+.dp-phase{margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);text-align:center}
+.dp-phase .phase-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);font-weight:600}
+.dp-phase .ex-name{font-size:22px;font-weight:700;margin-top:6px}
+.dp-audio{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;padding:12px;
+  border:1px solid var(--line);border-radius:14px;background:var(--surface);align-items:center}
+.dp-vol{display:flex;align-items:center;gap:8px;flex:1;min-width:140px;
+  font-size:12px;font-weight:600;color:var(--muted)}
+.dp-vol input{flex:1}
+.dp-controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.dp-controls .btn{flex:1 1 120px}
 </style>
 </head>
 <body>
@@ -282,6 +305,14 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
         <span id="micNote" class="note"></span>
       </div>
     </section>
+
+    <button id="dpEntryBtn" class="dp-entry" type="button">
+      <div>
+        <h3>Daily Practice</h3>
+        <p>Workout riyaz — pick a raag or sargam, set your time, and play</p>
+      </div>
+      <span class="arr">→</span>
+    </button>
 
     <section class="modes" aria-label="Mode">
       <span class="eyebrow">Mode</span>
@@ -390,6 +421,69 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
       <div class="tapkeys" id="tapKeys"></div>
     </details>
   </main>
+
+  <!-- ================= DAILY PRACTICE SETUP ================= -->
+  <main id="dp-setup" hidden>
+    <div class="p-head">
+      <button class="btn ghost" id="dpBackBtn" type="button">← Home</button>
+      <div class="p-title"><h2>Daily Practice</h2></div>
+    </div>
+    <div class="dp-setup-body">
+      <div class="field">
+        <span class="eyebrow">Mode</span>
+        <div class="chips" id="dpModeChips" role="group" aria-label="Practice mode"></div>
+      </div>
+      <div class="field">
+        <span class="eyebrow">Duration</span>
+        <div class="seg" id="dpDurSeg" role="group" aria-label="Session duration">
+          <button type="button" data-v="600">10 min</button>
+          <button type="button" data-v="900">15 min</button>
+          <button type="button" data-v="1200">20 min</button>
+          <button type="button" data-v="1800">30 min</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="dpTempo" class="eyebrow">Tempo · <output id="dpTempoOut" class="mono"></output></label>
+        <input id="dpTempo" type="range" min="40" max="100" step="4">
+      </div>
+      <div class="field">
+        <span class="eyebrow">Tanpura</span>
+        <button id="dpTanBtnSetup" class="tan js-tan" type="button" aria-pressed="false">
+          <span class="strings" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="tl">Start tanpura</span>
+        </button>
+      </div>
+      <button class="btn primary" id="dpStartBtn" type="button">Start Practice</button>
+    </div>
+  </main>
+
+  <!-- ================= DAILY PRACTICE SESSION ================= -->
+  <main id="dp-session" hidden>
+    <div class="dp-session-hd">
+      <button class="btn ghost" id="dpEndBtn" type="button">← End Session</button>
+      <span class="mono p-meta" id="dpTime">0:00 / 0:00</span>
+    </div>
+    <div class="dp-phase" id="dpPhaseBox">
+      <div class="phase-label" id="dpPhaseName">—</div>
+      <div class="ex-name" id="dpExName">—</div>
+    </div>
+    <div class="tiles" id="dpTiles" aria-label="Current notes" style="margin-top:16px"></div>
+    <div class="progress" aria-hidden="true" style="margin-top:12px"><i id="dpBar"></i></div>
+    <div class="dp-audio">
+      <button id="dpTanBtnSession" class="tan js-tan" type="button" aria-pressed="false">
+        <span class="strings" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="tl">Tanpura</span>
+      </button>
+      <div class="dp-vol">
+        <span>Tabla</span>
+        <input id="dpTablaVol" type="range" min="0" max="1" step="0.05">
+      </div>
+    </div>
+    <div class="dp-controls">
+      <button class="btn" id="dpPauseBtn" type="button">Pause</button>
+    </div>
+    <div class="msg" id="dpMsg" role="status" aria-live="polite"></div>
+  </main>
 </div>
 
 <!-- ================= RESULT ================= -->
@@ -409,6 +503,23 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
       <button class="btn primary" id="rNext" type="button">Next lesson</button>
       <button class="btn" id="rRetry" type="button">Try again</button>
       <button class="btn ghost" id="rBack" type="button">Back to lessons</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DAILY PRACTICE RESULT ================= -->
+<div id="dp-result" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="dprTitle">
+  <div class="sheet-in">
+    <h2 id="dprTitle">Practice Complete</h2>
+    <p class="muted" id="dprSub"></p>
+    <dl class="stats">
+      <div><dt>Time</dt><dd id="dprTime" class="mono"></dd></div>
+      <div><dt>Mode</dt><dd id="dprMode"></dd></div>
+      <div><dt>Phases</dt><dd id="dprPhases" class="mono"></dd></div>
+    </dl>
+    <div class="sheet-actions" style="margin-top:8px">
+      <button class="btn primary" id="dprAgain" type="button">Practice Again</button>
+      <button class="btn ghost" id="dprHome" type="button">Back to Home</button>
     </div>
   </div>
 </div>
