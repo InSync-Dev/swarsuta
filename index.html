@@ -481,6 +481,7 @@ details.tap summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:
     </div>
     <div class="dp-controls">
       <button class="btn" id="dpPauseBtn" type="button">Pause</button>
+      <button class="btn ghost" id="dpSkipBtn" type="button">Skip →</button>
     </div>
     <div class="msg" id="dpMsg" role="status" aria-live="polite"></div>
   </main>
@@ -2061,6 +2062,10 @@ function wire(){
   $('#dpEndBtn').addEventListener('click', dpEndSession);
 
   $('#dpPauseBtn').addEventListener('click', dpPauseToggle);
+
+  $('#dpSkipBtn').addEventListener('click', () => {
+    if(dp.status === 'running' || dp.status === 'paused') dpAdvanceExercise();
+  });
 
   $('#dpTablaVol').value = dp.tablaVol;
   $('#dpTablaVol').addEventListener('input', e => {
