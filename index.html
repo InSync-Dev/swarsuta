@@ -625,6 +625,144 @@ STAGES.forEach((st, si) => st.items.forEach(it => {
 }));
 
 /* =====================================================================
+   Daily Practice — raag definitions
+   ===================================================================== */
+const RAAG_DATA = {
+  sargam: {
+    name: 'Basic Sargam', dev: 'सरगम',
+    perNote: 'S S S S | R R R R | G G G G | M M M M | P P P P | D D D D | N N N N | S\' S\' S\' S\'',
+    alankars: [
+      { name: 'Alankar 1 — Groups of 3', seq: 'S R G | R G M | G M P | M P D | P D N | D N S\'' },
+      { name: 'Alankar 2 — Step up-back', seq: 'S R S | R G R | G M G | M P M | P D P | D N D | N S\' N' },
+      { name: 'Alankar 3 — Thirds', seq: 'S G | R M | G P | M D | P N | D S\'' },
+      { name: 'Alankar 4 — Five-note arches', seq: 'S R G R S | R G M G R | G M P M G | M P D P M | P D N D P | D N S\' N D' },
+      { name: 'Descending patterns', seq: 'S\' N D | N D P | D P M | P M G | M G R | G R S' }
+    ],
+    random: { name: 'Random Drill' }
+  },
+  bhoopali: {
+    name: 'Bhoopali', dev: 'भूपाली',
+    warmup: 'S R G P D S\' | S\' D P G R S',
+    alankars: [
+      { name: 'Alankar 1', seq: 'S R G | R G P | G P D | P D S\'' },
+      { name: 'Alankar 2', seq: 'S R S | R G R | G P G | P D P | D S\' D' },
+      { name: 'Alankar 3 — Thirds', seq: 'S G | R P | G D | P S\'' }
+    ],
+    phrases: [
+      { name: 'Phrase', seq: 'G R P G | D P G R S' }
+    ]
+  },
+  yaman: {
+    name: 'Yaman', dev: 'यमन',
+    warmup: 'N, R G m P D N S\' | S\' N D P m G R S',
+    alankars: [
+      { name: 'Alankar 1', seq: 'N, R G | R G m | G m P | m P D | P D N | D N S\'' },
+      { name: 'Alankar 2', seq: 'N, R N, | R G R | G m G | m P m | P D P | D N D | N S\' N' },
+      { name: 'Alankar 3 — Thirds', seq: 'N, G | R m | G P | m D | P N | D S\'' }
+    ],
+    phrases: [
+      { name: 'Phrase 1', seq: 'N, R G R S' },
+      { name: 'Phrase 2', seq: 'G m D N S\'' }
+    ]
+  },
+  bhairav: {
+    name: 'Bhairav', dev: 'भैरव',
+    warmup: 'S r G M P d N S\' | S\' N d P M G r S',
+    alankars: [
+      { name: 'Alankar 1', seq: 'S r G | r G M | G M P | M P d | P d N | d N S\'' },
+      { name: 'Alankar 2', seq: 'S r S | r G r | G M G | M P M | P d P | d N d | N S\' N' },
+      { name: 'Alankar 3 — Thirds', seq: 'S G | r M | G P | M d | P N | d S\'' }
+    ],
+    phrases: [
+      { name: 'Phrase 1', seq: 'S G M P d P' },
+      { name: 'Phrase 2', seq: 'G M r S' }
+    ]
+  },
+  kafi: {
+    name: 'Kafi', dev: 'काफ़ी',
+    warmup: 'S R g M P D n S\' | S\' n D P M g R S',
+    alankars: [
+      { name: 'Alankar 1', seq: 'S R g | R g M | g M P | M P D | P D n | D n S\'' },
+      { name: 'Alankar 2', seq: 'S R S | R g R | g M g | M P M | P D P | D n D | n S\' n' },
+      { name: 'Alankar 3 — Thirds', seq: 'S g | R M | g P | M D | P n | D S\'' }
+    ],
+    phrases: [
+      { name: 'Phrase 1', seq: 'S R g M P' },
+      { name: 'Phrase 2', seq: 'M g R S' }
+    ]
+  }
+};
+
+function buildDailyPhases(mode, totalSec){
+  const rd = RAAG_DATA[mode];
+  if(mode === 'sargam'){
+    const perNoteSec  = Math.round(totalSec * 0.20);
+    const alankarSec  = Math.round(totalSec * 0.50);
+    const randomSec   = totalSec - perNoteSec - alankarSec;
+    const alankarSlice = Math.floor(alankarSec / rd.alankars.length);
+    return [
+      { name: 'Per-Note Practice', exercises:[
+          { name: 'Sa \u2192 Ni \u2192 Sa\'', notes: parseSeq(rd.perNote), random: false }
+        ], duration: perNoteSec, sliceSec: perNoteSec },
+      { name: 'Alankars', exercises: rd.alankars.map(a => ({
+          name: a.name, notes: parseSeq(a.seq), random: false
+        })), duration: alankarSec, sliceSec: alankarSlice },
+      { name: 'Random Drill', exercises:[
+          { name: 'Random notes', notes: null, random: true }
+        ], duration: randomSec, sliceSec: randomSec }
+    ];
+  }
+  const warmupSec    = Math.round(totalSec * 0.15);
+  const alankarSec   = Math.round(totalSec * 0.65);
+  const phraseSec    = totalSec - warmupSec - alankarSec;
+  const alankarSlice = Math.floor(alankarSec / rd.alankars.length);
+  const phraseSlice  = rd.phrases.length > 0 ? Math.floor(phraseSec / rd.phrases.length) : phraseSec;
+  return [
+    { name: 'Warm-up', exercises:[
+        { name: rd.name + ' \u2014 Aroha / Avaroha', notes: parseSeq(rd.warmup), random: false }
+      ], duration: warmupSec, sliceSec: warmupSec },
+    { name: 'Alankars', exercises: rd.alankars.map(a => ({
+        name: a.name, notes: parseSeq(a.seq), random: false
+      })), duration: alankarSec, sliceSec: alankarSlice },
+    { name: 'Phrases', exercises: rd.phrases.map(p => ({
+        name: p.name, notes: parseSeq(p.seq), random: false
+      })), duration: phraseSec, sliceSec: phraseSlice }
+  ];
+}
+
+/* =====================================================================
+   Daily Practice — tabla audio
+   ===================================================================== */
+const TABLA_URL = 'https://cdn.freesound.org/previews/95/95680_1315834-lq.mp3';
+
+async function loadTabla(){
+  try{
+    const res = await fetch(TABLA_URL, {mode:'cors'});
+    if(!res.ok) return null;
+    const arr = await res.arrayBuffer();
+    return await audio().decodeAudioData(arr);
+  }catch(e){ return null; }
+}
+
+function startTabla(buf, gainNode){
+  if(!buf || !ac) return;
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  src.connect(gainNode);
+  gainNode.connect(master);
+  src.start(ac.currentTime);
+  dp.tablaSrc = src;
+}
+
+function stopTabla(){
+  if(dp.tablaSrc){
+    try{ dp.tablaSrc.stop(); dp.tablaSrc.disconnect(); }catch(e){}
+    dp.tablaSrc = null;
+  }
+}
+
+/* =====================================================================
    State and helpers
    ===================================================================== */
 const $ = (s, r=document) => r.querySelector(s);
