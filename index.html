@@ -733,33 +733,71 @@ function buildDailyPhases(mode, totalSec){
 /* =====================================================================
    Daily Practice — tabla audio
    ===================================================================== */
-const TABLA_URL = 'https://cdn.freesound.org/previews/95/95680_1315834-lq.mp3';
+/* Teen taal 16-beat pattern: S=sam/dha(strong), T=tun, N=na, K=khali(open bass) */
+const TABLA_PAT = ['S','T','N','T', 'T','N','T','K', 'N','T','N','T', 'T','N','T','T'];
+const dpTablaTimer = {timer:null, next:0, beat:0};
 
-async function loadTabla(){
-  try{
-    const res = await fetch(TABLA_URL, {mode:'cors'});
-    if(!res.ok) return null;
-    const arr = await res.arrayBuffer();
-    return await audio().decodeAudioData(arr);
-  }catch(e){ return null; }
+function tablaStroke(t, type, gn){
+  if(!ac || !gn) return;
+  if(type === 'S' || type === 'K'){
+    /* bayan — bass drum */
+    const o = ac.createOscillator(), g = ac.createGain();
+    const f = type === 'S' ? 130 : 105;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 0.55, t + 0.22);
+    g.gain.setValueAtTime(type === 'S' ? 0.9 : 0.6, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    o.connect(g); g.connect(gn); o.start(t); o.stop(t + 0.55);
+    if(type === 'S'){
+      /* treble pop on sam */
+      const o2 = ac.createOscillator(), g2 = ac.createGain();
+      o2.frequency.setValueAtTime(540, t);
+      o2.frequency.exponentialRampToValueAtTime(340, t + 0.06);
+      g2.gain.setValueAtTime(0.5, t);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+      o2.connect(g2); g2.connect(gn); o2.start(t); o2.stop(t + 0.13);
+    }
+  } else if(type === 'T'){
+    /* tun — dayan treble */
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.setValueAtTime(490, t);
+    o.frequency.exponentialRampToValueAtTime(370, t + 0.07);
+    g.gain.setValueAtTime(0.42, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    o.connect(g); g.connect(gn); o.start(t); o.stop(t + 0.18);
+  } else {
+    /* na — lighter treble */
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.setValueAtTime(580, t);
+    o.frequency.exponentialRampToValueAtTime(440, t + 0.05);
+    g.gain.setValueAtTime(0.28, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    o.connect(g); g.connect(gn); o.start(t); o.stop(t + 0.13);
+  }
 }
 
-function startTabla(buf, gainNode){
-  if(!buf || !ac) return;
-  const src = ac.createBufferSource();
-  src.buffer = buf;
-  src.loop = true;
-  src.connect(gainNode);
-  gainNode.connect(master);
-  src.start(ac.currentTime);
-  dp.tablaSrc = src;
+function dpSchedTabla(){
+  if(!ac || dp.status !== 'running' || !dp.tablaGain) return;
+  const bl = 60 / state.tempo;
+  while(dpTablaTimer.next < ac.currentTime + 0.5){
+    tablaStroke(dpTablaTimer.next, TABLA_PAT[dpTablaTimer.beat % TABLA_PAT.length], dp.tablaGain);
+    dpTablaTimer.beat++;
+    dpTablaTimer.next += bl;
+  }
+}
+
+function startTabla(){
+  if(!ac) return;
+  dpTablaTimer.next = ac.currentTime + 0.15;
+  dpTablaTimer.beat = 0;
+  clearInterval(dpTablaTimer.timer);
+  dpTablaTimer.timer = setInterval(dpSchedTabla, 80);
+  dpSchedTabla();
 }
 
 function stopTabla(){
-  if(dp.tablaSrc){
-    try{ dp.tablaSrc.stop(); dp.tablaSrc.disconnect(); }catch(e){}
-    dp.tablaSrc = null;
-  }
+  clearInterval(dpTablaTimer.timer);
+  dpTablaTimer.timer = null;
 }
 
 /* =====================================================================
@@ -2055,8 +2093,6 @@ const dp = {
   exIdx: 0,
   exElapsed: 0,
   status: 'idle',
-  tablaBuffer: null,
-  tablaSrc: null,
   tablaGain: null,
   tablaVol: 0.6,
   schedNext: 0,
@@ -2198,7 +2234,7 @@ function dpFrame(ts){
   $$('#dpTiles .tile').forEach((t, i) => t.classList.toggle('hear', i === dp.curNoteIdx));
 }
 
-async function dpStartSession(mode, totalSec){
+function dpStartSession(mode, totalSec){
   dp.mode       = mode;
   dp.totalSec   = totalSec;
   dp.elapsed    = 0;
@@ -2214,12 +2250,8 @@ async function dpStartSession(mode, totalSec){
   audio();
   dp.tablaGain = ac.createGain();
   dp.tablaGain.gain.value = dp.tablaVol;
-  if(!dp.tablaBuffer){
-    const msgEl = $('#dpMsg'); if(msgEl) msgEl.textContent = 'Loading tabla\u2026';
-    dp.tablaBuffer = await loadTabla();
-    if(msgEl) msgEl.textContent = dp.tablaBuffer ? '' : 'Tabla not available \u2014 tanpura only.';
-  }
-  if(dp.tablaBuffer) startTabla(dp.tablaBuffer, dp.tablaGain);
+  dp.tablaGain.connect(master);
+  startTabla();
 
   dpLoadExercise();
   dpRenderSession();
@@ -2236,7 +2268,7 @@ function dpPauseToggle(){
     const pb = $('#dpPauseBtn'); if(pb) pb.textContent = 'Resume';
   } else if(dp.status === 'paused'){
     dp.status = 'running';
-    if(dp.tablaBuffer) startTabla(dp.tablaBuffer, dp.tablaGain);
+    startTabla();
     dp.schedNext    = ac ? ac.currentTime + 0.3 : 0;
     dp.randomNextAt = ac ? ac.currentTime + 0.3 : 0;
     dp.lastTs = performance.now();
